@@ -37,14 +37,20 @@ valuationloop:
     batch-size: 100
   reply-window-hours: 24           # valuation-request: "reply by end of next working day" (simplified to 24h in v1)
 
+server:
+  address: 127.0.0.1               # local demo: the API is not exposed beyond this machine
+
 management:
+  server:
+    address: 127.0.0.1
+    port: 8081                     # actuator on its own loopback port, apart from the API
   endpoints:
     web:
       exposure:
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
 
 logging:
   level:
