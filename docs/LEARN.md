@@ -4,11 +4,13 @@ For Ahmed, after the build. The goal of the two days: explain any line of this r
 defend every design choice in an interview. Line counts are approximate. Paths are from the repo root; Java lives
 under `src/main/java/uk/valuationloop/` and tests under `src/test/java/uk/valuationloop/`.
 
-Setup once: `make services-up`, then `make test` (green), then `make run` in one terminal.
+Setup once: `make services-up`, then `make test` (green), then `make run` in one terminal. Java is not on this box's
+PATH, and the `./gradlew` and Kafka commands below need it, so first, in every new shell:
+`export JAVA_HOME=~/jdks/jdk-21.0.12.1+1 PATH=~/jdks/jdk-21.0.12.1+1/bin:$PATH` (the Makefile sets it for `make`).
 
 ## Learn day 1
 
-**Morning.** Run `make demo` and `make replay` <!-- verify after merge -->. Read the README and the RFC. Then follow
+**Morning.** Run `make demo` and `make replay` (stop `make run` first: both start the app themselves; see docs/DEMO.md). Read the README and the RFC. Then follow
 one request through the code with the walk-through below, the Django map in `../STUDY-TONIGHT.md` beside it.
 **Afternoon.** The three break-and-fix exercises.
 **Evening.** Write, in your own words, the answer to "walk me through what happens between commit and send". Check it
@@ -44,7 +46,7 @@ against RFC §7 only after you have written it.
 | 18 | `scorecard/ScorecardReplayTest`, `ProductQueryTest` | 205, 75 | Claim 3's tests |
 | 19 | `dataloader/ComparablesLoaderRunner`, `EpcLookup`, `AddressKey`, `OsgbToWgs84`, `RangeWidthStatsRunner` | 180, 210, 70, 130, 135 | The data and the real number |
 | 20 | `api/ApiErrors`, `src/main/resources/application.yml`, `Makefile`, `build.gradle.kts` | 125, 110, 120, 45 | Plumbing |
-| 21 | `simulator/` <!-- verify after merge --> | | `make demo` |
+| 21 | `simulator/SimulatorScenarios`, `OutboxGapDemo`, `SimulatorController`, `scripts/demo.sh`, `docs/DEMO.md` | 410, 175, 70, 80, 35 | `make demo` |
 
 Steps 1 to 12 are day 1. Steps 13 to 21 are day 2 morning, before the feature.
 
@@ -210,7 +212,8 @@ make each step's test pass before the next:
 5. `request/RequestCloser`: is a withdrawn lead terminal?
 6. `scorecard/ScorecardProjector.HANDLED` and what the fact records.
 7. An API test in the style of `response/ReplyApiTest`.
-Alternative: a new simulator scenario <!-- verify after merge -->.
+Alternative: a new simulator scenario, for example `two-sellers` (two requests in the same outcode at once), added to
+`SimulatorScenarios.NAMES` and `run`, with a check in `simulator/SimulatorScenarioTest`.
 
 ## 20 interview questions
 
@@ -227,7 +230,10 @@ Model answers are short on purpose. Rewrite each in your own words before the in
    natural-key upsert. Kafka transactions would not cover the Postgres write anyway.
 4. **How is ordering kept?** Per key. Everything about one request is keyed by `requestId`, so it lands on one partition
    and one consumer sees it in order. The relay stops a batch on a failed send so later rows do not overtake. Across
-   requests there is no order and none is needed.
+   requests there is no order and none is needed. The catch to name yourself: that holds with one relay instance.
+   With several, `SKIP LOCKED` stops them sending a row twice but not one instance sending a later row for a key
+   before another sends an earlier one; the scorecard does not care (its rules are order-independent), a consumer
+   that did would need per-key locking or change-data-capture.
 5. **Why is DeliverLead keyed by leadId but events by requestId?** Delivery is per agent: keying by lead lets one
    request's leads spread over partitions and listener threads, and keeps every copy of one lead's command in order.
    Events are per request: the scorecard needs them in order for a request. Be honest about v1: one partition and one
@@ -236,9 +242,10 @@ Model answers are short on purpose. Rewrite each in your own words before the in
 6. **Why no ranking of agents?** Agents are the paying customers, and a platform verdict on a named agent built on this
    data is a claim nothing could back. Technically, comparables disagree by a median 28% of value, so a 5 to 10%
    difference between two agents is noise. Eligibility is a lookup; the seller sees evidence in reply order.
-7. **What about the data licences?** PPD and Code-Point Open are OGL with attribution strings, shown in the README and
-   in every pack. EPC address fields are OS and Royal Mail restricted: they are hashed in loader memory for the join
-   and never stored. Production would use Rightmove's own address licences.
+7. **What about the data licences?** PPD, Code-Point Open and the non-address EPC fields are OGL with attribution
+   strings, shown in the README and in every pack. EPC address fields are OS and Royal Mail restricted, for energy
+   performance purposes only: here they are hashed in loader memory for the join and never stored. That join is still
+   a use of them outside that purpose, which is why production would use Rightmove's own address licences.
 8. **What does the demo not prove?** Business impact. Agents, CRMs, sellers and outcomes are simulated. It proves the
    mechanics and gives the product team the query to run on real traffic.
 9. **What changes at 10x load?** More partitions and listener concurrency; several relay instances (SKIP LOCKED already
@@ -247,10 +254,13 @@ Model answers are short on purpose. Rewrite each in your own words before the in
 10. **Crash between send and mark?** The send reached Kafka but `sent_at` never committed, so the row is still unsent
     and goes again. The consumer sees two records with the same `eventId`; delivery skips a lead already delivered and
     the scorecard upsert writes the same row.
-11. **Why is the listener not @Transactional?** If it were, the offset ack could happen before the database commit, and
-    a failed commit would lose the record. The listener calls a transactional service through the proxy and returns;
-    the container commits the offset only after the database commit. Also, the adapter call must not hold a
-    transaction open.
+11. **Why is the listener not @Transactional?** Two reasons. The delivery is three steps on purpose (commit "attempt n",
+    call the CRM with no transaction open, commit "delivered"): one transaction around the listener would hold a
+    connection and row lock through a third-party call and roll the attempt counter back on every failure. And the
+    trap H2 named: a transactional listener that acknowledges manually inside its body acks before the commit, so a
+    failed commit loses the record. Here the listener calls transactional services through the proxy and returns,
+    and with ack-mode record the container commits the offset only after that, so a crash means a redelivery, which
+    the state check makes harmless.
 12. **Why does upsert by lead_id make replay possible?** The row is a function of the events for that lead, and every
     rule is order-independent. Replaying from offset 0 into an empty table produces the same rows. With a dedupe table
     instead, a replay would skip every event as already seen.
