@@ -14,8 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Component;
 import uk.valuationloop.evidence.ComparableDocument;
 import uk.valuationloop.evidence.EvidenceProperties;
@@ -47,11 +49,14 @@ public class ComparablesLoaderRunner implements ApplicationRunner {
     private final LoaderProperties props;
     private final EvidenceProperties evidence;
     private final EsIndexWriter writer;
+    private final ConfigurableApplicationContext context;
 
-    public ComparablesLoaderRunner(LoaderProperties props, EvidenceProperties evidence, EsIndexWriter writer) {
+    public ComparablesLoaderRunner(LoaderProperties props, EvidenceProperties evidence, EsIndexWriter writer,
+                                   ConfigurableApplicationContext context) {
         this.props = props;
         this.evidence = evidence;
         this.writer = writer;
+        this.context = context;
     }
 
     @Override
@@ -110,6 +115,16 @@ public class ComparablesLoaderRunner implements ApplicationRunner {
                 tiers.getOrDefault(EpcLookup.Tier.FULL, 0), tiers.getOrDefault(EpcLookup.Tier.SHORT, 0),
                 tiers.getOrDefault(EpcLookup.Tier.IDENTITY, 0), indexed, evidence.index(), centroidDocs,
                 evidence.centroidIndex(), vintage);
+        exitWhenDone(context);
+    }
+
+    /**
+     * A one-shot job ends the process when it is done. Without this the JVM would stay up: the Elasticsearch
+     * client's I/O threads are non-daemon. SpringApplication.exit closes the context (and with it the client)
+     * and returns the exit code. The runners are only beans under --loader.run / --loader.stats, never in tests.
+     */
+    static void exitWhenDone(ConfigurableApplicationContext context) {
+        System.exit(SpringApplication.exit(context, () -> 0));
     }
 
     /** Streams one file line by line (never the whole file in memory). Returns the malformed-line count. */

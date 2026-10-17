@@ -17,8 +17,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Component;
 import uk.valuationloop.evidence.ComparableDocument;
 import uk.valuationloop.evidence.ComparablesQuery;
@@ -50,13 +52,15 @@ public class RangeWidthStatsRunner implements ApplicationRunner {
     private final EvidenceProperties evidence;
     private final LoaderProperties props;
     private final Clock clock;
+    private final ConfigurableApplicationContext context;
 
     public RangeWidthStatsRunner(ElasticsearchClient client, EvidenceProperties evidence, LoaderProperties props,
-                                 Clock clock) {
+                                 Clock clock, ConfigurableApplicationContext context) {
         this.client = client;
         this.evidence = evidence;
         this.props = props;
         this.clock = clock;
+        this.context = context;
     }
 
     @Override
@@ -91,6 +95,7 @@ public class RangeWidthStatsRunner implements ApplicationRunner {
                 asOf, props.statsSeed(), props.statsOutcodes());
         log.info(summary);
         System.out.println(summary);
+        ComparablesLoaderRunner.exitWhenDone(context);
     }
 
     /** Every FLAT/HOUSE doc in the outcodes, paged with search_after (sorted by id, so paging is stable). */
