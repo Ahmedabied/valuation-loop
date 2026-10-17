@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import uk.valuationloop.observability.EventTracing;
 import uk.valuationloop.outbox.EventEnvelope;
 import uk.valuationloop.outbox.Topics;
 
@@ -51,6 +52,7 @@ public class ScorecardListener {
             log.warn("scorecard skips a record that is not an event envelope: {}", e.getOriginalMessage());
             return;
         }
-        projector.apply(envelope);
+        // the envelope's traceparent makes this log under the traceId of the API request that caused the event
+        EventTracing.inTrace(envelope.traceparent(), "scorecard.apply", () -> projector.apply(envelope));
     }
 }
