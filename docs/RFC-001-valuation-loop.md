@@ -139,8 +139,8 @@ One JSON envelope for every event: `eventId` (UUIDv7, the idempotency key), `eve
 | `lead.events.v1` | requestId | LeadDelivered, LeadDeliveryFailed, LeadReplied, EvidenceAttached, LeadExpired, SellerEngaged, SellerSelected, VisitBooked | scorecard |
 | `outcome.recorded.v1` | requestId | InstructionRecorded | scorecard |
 
-**Correction to the architecture note.** ARCHITECTURE.md §4 names the retry topics `-retry-0..2`. That is an
-off-by-one: 3 attempts is one try on the main topic plus 2 retries, so the topics are `-retry-0` and `-retry-1`.
+**Correction to the architecture note.** ARCHITECTURE.md §4 named the retry topics `-retry-0..2` (corrected there on
+2026-10-17). That was an off-by-one: 3 attempts is one try on the main topic plus 2 retries, so the topics are `-retry-0` and `-retry-1`.
 `delivery/DeliveryRetryAndDltTest.springKafkaCreatedTheRetryAndDltTopicsWithTheseNames` pins the real names.
 
 **Keys.** Everything about one request is keyed by `requestId`, so it lands on one partition and the scorecard sees it
