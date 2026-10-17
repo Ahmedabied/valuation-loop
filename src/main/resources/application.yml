@@ -36,6 +36,52 @@ valuationloop:
     relay-delay-ms: 300
     batch-size: 100
   reply-window-hours: 24           # valuation-request: "reply by end of next working day" (simplified to 24h in v1)
+  delivery:
+    slow-ms: 2000                  # how long the simulated "slow" CRM adapter takes per call
+    flaky-failures: 2              # calls per lead the simulated "flaky" adapter fails before it succeeds
+    deadline-scan-ms: 5000         # how often the deadline scanner looks for leads past reply_due_at
+    deadline-scanner:
+      enabled: true                # off in tests, which drive DeadlineScanner.scanOnce() by hand
+    listener:
+      auto-startup: true           # the lead.deliver.v1 consumer (and its retry/DLT containers) start with the app
+  scorecard:
+    listener:
+      auto-startup: true           # the scorecard consumer; make replay starts it by hand after truncating
+  outcome:
+    # Shared secret the CRM sends in X-Webhook-Token on POST /outcomes/webhook. Demo only: production uses a
+    # per-CRM HMAC signature over the body, which also binds the leadRef to the agent whose CRM signed it.
+    webhook-token: demo-webhook-token
+  es:
+    url: http://127.0.0.1:9200     # Elasticsearch for comparables (loopback, security off locally)
+  evidence:
+    index: comparables-v1          # comparables index the loader writes and the pack builder reads
+    centroid-index: postcode-centroids-v1  # postcode -> lat/lon (Code-Point Open centroids)
+    radius-m: 1500                 # hard filter: only sales within this distance of the request postcode
+    max-age-months: 24             # hard filter: only sales in the last N months
+    size: 10                       # comparables per pack, at most
+    location-scale-m: 400          # gauss decay: a sale this far away scores 0.5 on location
+    date-scale-days: 180           # gauss decay: a sale this old scores 0.5 on recency
+    floor-area-scale-m2: 15        # gauss decay on floor-area difference (after the offset)
+    floor-area-offset-m2: 5        # floor-area differences up to this count as a perfect match
+    missing-floor-area-weight: 0.5 # a comparable with no floor area ranks below an equal one that has it
+
+# Data loader (dataloader/LoaderProperties.java). Normally run with the "loader" profile: make load / make stats.
+loader:
+  run: false                       # true: load PPD + Code-Point + EPC-derived attributes into Elasticsearch
+  recreate: false                  # true: drop and recreate both indices first
+  stats: false                     # true: print the comparables-range width statistic (the README's number)
+  ppd-files:                       # Land Registry Price Paid yearly files, oldest first (paths relative to the repo)
+    - ../data-raw/ppd/pp-2024.csv
+    - ../data-raw/ppd/pp-2025.csv
+    - ../data-raw/ppd/pp-2026.csv
+  codepoint-zip: ../data-raw/codepoint/codepo_gb.zip   # OS Code-Point Open
+  codepoint-areas: [sw, se]        # postcode areas to load centroids for
+  epc-file: ../data-raw/epc/epc-wandsworth-lambeth.csv # EPC certificates pre-filtered to the two boroughs
+  districts: [WANDSWORTH, LAMBETH] # PPD district values to keep
+  bulk-size: 1000                  # documents per Elasticsearch bulk request
+  stats-outcodes: [SW11, SW4, SW12, SW18, SW2, SW9, SE24, SE11]  # outcodes the range-width sample is drawn from
+  stats-sample: 400                # pseudo-requests in the statistic
+  stats-seed: 42                   # shuffle seed, so the number is reproducible
 
 server:
   address: 127.0.0.1               # local demo: the API is not exposed beyond this machine
