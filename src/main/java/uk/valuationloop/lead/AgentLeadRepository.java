@@ -13,4 +13,7 @@ public interface AgentLeadRepository extends JpaRepository<AgentLead, String> {
 
     /** Leads whose reply window has closed; the deadline scanner expires them. */
     List<AgentLead> findByStateAndReplyDueAtBefore(LeadState state, Instant cutoff);
+
+    /** One agent's own leads, oldest first (GET /agents/{agentId}/leads). Never another agent's rows. */
+    List<AgentLead> findByAgentIdOrderByCreatedAt(String agentId);
 }
