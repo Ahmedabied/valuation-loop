@@ -20,7 +20,7 @@ The design is in [docs/RFC-001-valuation-loop.md](docs/RFC-001-valuation-loop.md
 | 2 | Every reply can carry an evidence pack built to one standard from real public data, chosen and curated by the agent, machine-readable, with provenance. | `evidence/ComparablesQueryTest.missingFloorAreaGetsHalfWeightInTheSameQuery`, `evidence/ComparablesRankingEsTest.floorAreaMatchRanksAboveMissingFloorArea` and `packFromLiveEsHasProvenanceAndAttachEmitsASchemaValidEvent` (live Elasticsearch) |
 | 3 | The seller's choice, the visit and the instruction join back to the lead even when late and out of order, and one replayable query answers "do evidenced answers win the seller, and at what price gap?". | `scorecard/ScorecardReplayTest.outOfOrderLateAndDuplicateEventsProjectDeterministicallyAndReplayRebuildsIdenticalFacts`, `scorecard/ProductQueryTest.sharesCapturedByTheHighestRangeReplySplitByEvidence` |
 
-All test paths are under `src/test/java/uk/valuationloop/`. There are 143 tests; the two live-Elasticsearch ones run
+All test paths are under `src/test/java/uk/valuationloop/`. There are 146 tests; the two live-Elasticsearch ones run
 only with `make test-es` (`./gradlew test -Pes=true`).
 
 ## The real number
@@ -106,7 +106,7 @@ Gradle comes from the wrapper (`./gradlew`, Gradle 8.14.3).
 ### Steps
 
 ```
-make test            # 143 tests: 141 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
+make test            # 146 tests: 144 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
 make services-up     # Postgres on 5433, Kafka on 9092, Elasticsearch on 9200 (make status to check)
 make test-es         # the same plus the two live-Elasticsearch tests (needs Elasticsearch up)
 make load            # load Wandsworth + Lambeth into Elasticsearch (about 23 s; make demo runs it if the index is missing)
@@ -125,8 +125,11 @@ of this Gradle version, so not while another session on the box is building). `m
 app themselves on 8080/8081 and refuse if `make run` holds those ports; they wait (up to 3 minutes) while less than
 2.5 GB of RAM is free. A Gradle daemon kept from `make test` holds about 1 GB; stop it first on a tight box.
 
-Checked from a cold start on 2026-10-17: `make test` (125 tests, 2 skipped), `make services-up`, `make demo` twice,
-`make replay` (`replay: IDENTICAL ... (66 facts)`, exit 0), `make test-es` (both live tests pass), `make services-down`.
+Checked from a cold start on 2026-10-17, after the phase 2 merge: `make test` (146 tests, 2 skipped),
+`make services-up`, `make demo` twice (the existing V1-V3 database migrated to V5 in place; ok scenario
+`completed=true` as a self-match), `make replay` (`replay: IDENTICAL ... (141 facts)`, exit 0), `make demo-split`
+(every delivery and the DLT in the worker, every scorecard line in the api), `make test-es` (146 tests, both live
+tests pass), `make services-down`.
 
 ### Side-by-side page
 
