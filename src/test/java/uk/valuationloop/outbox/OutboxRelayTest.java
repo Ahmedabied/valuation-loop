@@ -25,7 +25,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * a crash between commit and send loses nothing. The relay scheduler is OFF in tests so the test can stand
  * in the gap and look at it.
  */
-@SpringBootTest
+@SpringBootTest(properties = // its own in-memory database, never shared with another test context
+        "spring.datasource.url=jdbc:h2:mem:outbox_relay_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
 @EmbeddedKafka(kraft = true, partitions = 1, topics = Topics.LEAD_EVENTS)
 class OutboxRelayTest {
 

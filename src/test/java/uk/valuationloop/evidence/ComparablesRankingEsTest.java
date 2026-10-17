@@ -40,7 +40,8 @@ import uk.valuationloop.support.EventSchemas;
  * Uses throwaway indices named *-test-&lt;nanos&gt; and deletes them afterwards; comparables-v1 is never touched.
  */
 @EnabledIfSystemProperty(named = "es", matches = "true")
-@SpringBootTest(properties = "spring.kafka.listener.auto-startup=false")
+@SpringBootTest(properties = {"spring.kafka.listener.auto-startup=false",
+        "spring.datasource.url=jdbc:h2:mem:es_ranking_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)   // one instance for all tests, so @BeforeAll can use @Autowired beans
 class ComparablesRankingEsTest {
 
