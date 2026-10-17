@@ -9,7 +9,10 @@ public final class Topics {
     /** ValuationRequested, AgentsMatched, RequestClosed. Key: requestId. */
     public static final String VALUATION_REQUESTED = "valuation.requested.v1";
 
-    /** Command: DeliverLead, one record per lead. Key: leadId so one flaky agent never blocks the others. Retries below. */
+    /**
+     * Command: DeliverLead, one record per lead. Key: leadId, so with several partitions and listener threads one
+     * request's leads spread out (v1 runs one partition and one thread; see delivery/SlowAdapter). Retries below.
+     */
     public static final String LEAD_DELIVER = "lead.deliver.v1";
 
     /**
