@@ -125,11 +125,12 @@ of this Gradle version, so not while another session on the box is building). `m
 app themselves on 8080/8081 and refuse if `make run` holds those ports; they wait (up to 3 minutes) while less than
 2.5 GB of RAM is free. A Gradle daemon kept from `make test` holds about 1 GB; stop it first on a tight box.
 
-Checked from a cold start on 2026-10-17, after the phase 2 merge: `make test` (146 tests, 2 skipped),
-`make services-up`, `make demo` twice (the existing V1-V3 database migrated to V5 in place; ok scenario
-`completed=true` as a self-match), `make replay` (`replay: IDENTICAL ... (141 facts)`, exit 0), `make demo-split`
-(every delivery and the DLT in the worker, every scorecard line in the api), `make test-es` (146 tests, both live
-tests pass), `make services-down`.
+Checked again on Spring Boot 4.1.1 on 2026-10-17 (second review), services stopped at the start: `make test` three
+times (149 tests, 2 skipped, each run forced), `make services-up`, `make demo` twice (ok scenario `completed=true` as
+a staged self-match, the subject's own sale removed from the pack first), `make replay` (`replay: IDENTICAL ...
+(173 facts)`, exit 0), `make demo-split` (every delivery and the DLT in the worker, every scorecard line in the api),
+`make page` and the comparison JSON for the ok request, `make test-es` (149 tests, both live tests pass),
+`make services-down`.
 
 ### Side-by-side page
 
