@@ -1,6 +1,6 @@
 # Profile "api": the jar as the front process of a split run (make run-api / run-split / demo-split).
 # Everything except delivery: the HTTP API on 8080 (actuator 8081, as in one process), the seller and agent flows,
-# evidence, outcomes, the scorecard consumer and, under "demo", the simulator.
+# evidence, outcomes, the scorecard consumer, the late-match scan and, under "demo", the simulator.
 # Not here: the DeliverLead listener (and its retry/DLT containers), the deadline scanner and the outbox relay. They
 # run in the "worker" process. This process still WRITES outbox rows in its transactions; the worker's relay picks
 # them up from the shared Postgres (SELECT ... FOR UPDATE SKIP LOCKED) and sends them. One relay keeps ordering simple:
@@ -16,5 +16,7 @@ valuationloop:
   scorecard:
     listener:
       auto-startup: true           # the scorecard (group "scorecard") is consumed here, not in the worker
+  completion:
+    enabled: true                  # the late-match scan (completion/CompletionScanner) runs here only
   simulator:
     worker-url: http://127.0.0.1:8090   # demo only: the flaky override and the DLT count live in the worker

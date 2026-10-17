@@ -12,6 +12,7 @@ import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import uk.valuationloop.completion.CompletionScanner;
 import uk.valuationloop.outbox.OutboxRelay;
 import uk.valuationloop.outbox.Topics;
 import uk.valuationloop.scorecard.ScorecardListener;
@@ -19,8 +20,9 @@ import uk.valuationloop.scorecard.ScorecardListener;
 /**
  * The split run's wiring, from the profile files alone (application-api.yml, application-worker.yml): one jar, two
  * contexts. Under "worker" the DeliverLead containers (lead.deliver.v1 and its retry/DLT containers) run and the outbox
- * relay sends; the scorecard container exists but never starts. Under "api" it is the other way round. The test yml
- * turns every consumer off, and the profile file must turn the right ones back on; nothing here overrides them.
+ * relay sends; the scorecard container exists but never starts and the late-match scan is off. Under "api" it is the
+ * other way round. The test yml turns every consumer and scan off, and the profile file must turn the right ones back
+ * on; nothing here overrides them.
  */
 class ApiWorkerProfilesTest {
 
@@ -49,6 +51,7 @@ class ApiWorkerProfilesTest {
 
         @Autowired KafkaListenerEndpointRegistry registry;
         @Autowired OutboxRelay relay;
+        @Autowired CompletionScanner completions;
 
         @Test
         void runsDeliveryAndTheRelayButNotTheScorecard() {
@@ -57,6 +60,7 @@ class ApiWorkerProfilesTest {
                 assertThat(c.isRunning()).as(c.getListenerId() + " running").isTrue();
             });
             assertThat(relay.isEnabled()).isTrue();
+            assertThat(completions.isEnabled()).as("late-match scan").isFalse();
             MessageListenerContainer scorecard = scorecardContainer(registry);
             assertThat(scorecard.isAutoStartup()).isFalse();
             assertThat(scorecard.isRunning()).isFalse();
@@ -73,6 +77,7 @@ class ApiWorkerProfilesTest {
 
         @Autowired KafkaListenerEndpointRegistry registry;
         @Autowired OutboxRelay relay;
+        @Autowired CompletionScanner completions;
 
         @Test
         void runsTheScorecardButNotDeliveryOrTheRelay() {
@@ -81,6 +86,7 @@ class ApiWorkerProfilesTest {
                 assertThat(c.isRunning()).as(c.getListenerId() + " running").isFalse();
             });
             assertThat(relay.isEnabled()).isFalse();
+            assertThat(completions.isEnabled()).as("late-match scan").isTrue();
             MessageListenerContainer scorecard = scorecardContainer(registry);
             assertThat(scorecard.isAutoStartup()).isTrue();
             assertThat(scorecard.isRunning()).isTrue();
