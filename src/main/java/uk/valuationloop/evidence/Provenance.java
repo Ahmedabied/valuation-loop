@@ -19,5 +19,12 @@ public record Provenance(List<String> attributions, String index, Map<String, Ob
             + "Contains Royal Mail data © Royal Mail copyright and database right 2026; "
             + "Contains National Statistics data © Crown copyright and database right 2026";
 
-    public static final List<String> ATTRIBUTIONS = List.of(LAND_REGISTRY, CODE_POINT);
+    /**
+     * The EPC fields a pack can carry (floor area, energy rating, built form) are non-address EPC data, which the
+     * register licenses under the Open Government Licence v3.0; OGL asks for this attribution.
+     */
+    public static final String EPC = "Contains public sector information licensed under the Open Government Licence v3.0 "
+            + "(Energy Performance of Buildings data, England and Wales, non-address fields only).";
+
+    public static final List<String> ATTRIBUTIONS = List.of(LAND_REGISTRY, CODE_POINT, EPC);
 }
