@@ -1,7 +1,7 @@
 -- V3: the scorecard read model (ARCHITECTURE.md §9). Portable SQL: runs on Postgres and H2 in PostgreSQL mode.
 -- This is the one replayable read model: the scorecard consumer builds it from lead.events.v1 + outcome.recorded.v1.
 -- Rows are upserted by lead_id, so replaying the topics rebuilds the same facts with no dedupe table.
--- Private to each agent: an agent reads only its own rows. It is never a league table and never orders agents.
+-- Private to each agent: an agent reads only its own rows. It never puts agents side by side and never orders them.
 create table scorecard_fact (
     lead_id           varchar(40)  primary key,
     request_id        varchar(40)  not null,
