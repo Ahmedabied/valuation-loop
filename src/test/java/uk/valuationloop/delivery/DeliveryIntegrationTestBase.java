@@ -32,14 +32,14 @@ import uk.valuationloop.outbox.Topics;
  * One Spring context for every delivery/response integration test (same annotations = Spring reuses the context,
  * so the broker and the app start once). Like a Django TestCase base class with shared fixtures.
  *
- * The whole loop runs for real here: the outbox relay is ON, the delivery listener consumes lead.deliver.v1, and
- * spring-kafka creates the retry and DLT topics itself (they are deliberately not pre-created below, so the topic
- * names the tests assert are the ones spring-kafka produced). Flaky always fails (99) so it reaches the DLT; slow
- * is 50 ms; the deadline scanner is driven by hand with a movable clock.
+ * The whole loop runs for real here: the outbox relay is ON, the delivery listener consumes lead.deliver.v1 with
+ * its production shape (6 partitions, 3 threads), and the retry and DLT topics come from the app's own DeliveryTopics
+ * bean, not from this annotation, so a test that uses them proves the app declares them. Flaky always fails (99) so
+ * it reaches the DLT; slow is 50 ms; the deadline scanner is driven by hand with a movable clock.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@EmbeddedKafka(kraft = true, partitions = 1,
+@EmbeddedKafka(kraft = true, partitions = 6,
         topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
 @TestPropertySource(properties = {
         // its own in-memory database: this context's relay and listener keep running while Spring caches the
