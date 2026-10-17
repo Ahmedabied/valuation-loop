@@ -1,0 +1,11 @@
+# Profile "local": the app on this box against the real Postgres (5433), Kafka (9092) and Elasticsearch (9200),
+# as started by `make demo` / `make replay` (always together with "demo"). Tests never use it, so their console
+# stays human-readable.
+logging:
+  structured:
+    format:
+      console: ecs                 # one JSON object per log line (Elastic Common Schema); MDC traceId/spanId included
+management:
+  tracing:
+    sampling:
+      probability: 1.0             # trace every request (default 0.1): the demo greps app.log by one request's traceId

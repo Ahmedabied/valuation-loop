@@ -15,6 +15,8 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
 import uk.valuationloop.delivery.DeliverLead.MalformedCommand;
+import uk.valuationloop.observability.EventTracing;
+import uk.valuationloop.observability.LoopMetrics;
 import uk.valuationloop.outbox.EventEnvelope;
 import uk.valuationloop.outbox.Topics;
 
@@ -34,6 +36,9 @@ import uk.valuationloop.outbox.Topics;
  * transactions through Spring's proxy) and returns; the container then commits the offset (ack-mode: record).
  * So the offset is only committed after the database commit; a crash in between means the record comes again,
  * and the service's idempotency check makes the second copy a no-op.
+ *
+ * Each record is handled inside a span opened from the envelope's traceparent ({@link EventTracing}), so these log
+ * lines share the traceId of the API request that created the lead.
  */
 @Component
 public class LeadDeliveryListener {
@@ -42,10 +47,12 @@ public class LeadDeliveryListener {
 
     private final LeadDeliveryService service;
     private final ObjectMapper objectMapper;
+    private final LoopMetrics metrics;
 
-    public LeadDeliveryListener(LeadDeliveryService service, ObjectMapper objectMapper) {
+    public LeadDeliveryListener(LeadDeliveryService service, ObjectMapper objectMapper, LoopMetrics metrics) {
         this.service = service;
         this.objectMapper = objectMapper;
+        this.metrics = metrics;
     }
 
     @RetryableTopic(
@@ -63,7 +70,8 @@ public class LeadDeliveryListener {
             groupId = "delivery",
             autoStartup = "${valuationloop.delivery.listener.auto-startup:true}")
     public void onDeliverLead(String envelopeJson) {
-        service.deliver(parse(envelopeJson));
+        EventEnvelope envelope = parse(envelopeJson);
+        EventTracing.inTrace(envelope.traceparent(), "lead.deliver", () -> service.deliver(DeliverLead.from(envelope)));
     }
 
     /**
@@ -73,9 +81,12 @@ public class LeadDeliveryListener {
     @DltHandler
     public void onDeadLetter(String envelopeJson,
                              @Header(name = KafkaHeaders.EXCEPTION_CAUSE_FQCN, required = false) byte[] causeClass) {
+        metrics.dltRecord();   // dlt_records_total counts every record that reached the DLT, readable or not
+        EventEnvelope envelope;
         DeliverLead cmd;
         try {
-            cmd = parse(envelopeJson);
+            envelope = parse(envelopeJson);
+            cmd = DeliverLead.from(envelope);
         } catch (MalformedCommand e) {
             log.error("unreadable record in the DLT, left there for a human: {}", e.getMessage());
             return;
@@ -83,12 +94,13 @@ public class LeadDeliveryListener {
         // spring-kafka records the class of the exception the listener threw in a header (bytes, like every Kafka
         // header); the cause is the adapter's own exception, e.g. CrmUnavailable
         String cause = causeClass == null ? "unknown error" : simpleName(new String(causeClass, StandardCharsets.UTF_8));
-        service.giveUp(cmd, "adapter '" + cmd.adapter() + "' failed on every attempt (" + cause + ")");
+        EventTracing.inTrace(envelope.traceparent(), "lead.deliver.dlt",
+                () -> service.giveUp(cmd, "adapter '" + cmd.adapter() + "' failed on every attempt (" + cause + ")"));
     }
 
-    private DeliverLead parse(String envelopeJson) {
+    private EventEnvelope parse(String envelopeJson) {
         try {
-            return DeliverLead.from(objectMapper.readValue(envelopeJson, EventEnvelope.class));
+            return objectMapper.readValue(envelopeJson, EventEnvelope.class);
         } catch (JsonProcessingException e) {
             throw new MalformedCommand("lead.deliver.v1 record is not a JSON envelope", e);
         }
