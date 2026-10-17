@@ -17,6 +17,10 @@ import org.springframework.stereotype.Component;
  *   reply_minutes        summary  minutes from delivery to the agent's reply (_count, _sum, _max), ReplyService
  * </pre>
  * Labels are deliberately absent: no agentId label, so no metric compares one agent with another.
+ *
+ * Split run: outbox_unsent is sampled by the relay, which runs only in the worker, so read it on the worker's 8091.
+ * The api process registers the gauge too but never samples it, so on 8081 it stays 0 while rows written by the
+ * api wait in the outbox for the worker (for example while the worker is down).
  */
 @Component
 public class LoopMetrics {

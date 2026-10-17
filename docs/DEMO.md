@@ -46,7 +46,7 @@ The same jar as two processes (`application-api.yml`, `application-worker.yml`):
 
 The api still writes its outbox rows in its own transactions; the worker's relay (the only one running) sends them
 from the shared Postgres. The DLT handler, and the request closure when every lead failed, run in the worker and
-write through the same database and outbox. In the api the delivery listener bean exists but its containers never start.
+write through the same database and outbox. In the api the delivery listener bean exists but its containers never start. If the worker is down, the api's requests still commit and their rows wait in the outbox until the worker's relay runs again; `outbox_unsent` counts them only on the worker's 8091 (the api never samples the gauge, so its 8081 shows 0).
 
 `make run-api`, `make run-worker`, `make run-split` start them in the background (pidfiles and logs
 `~/tools/logs/{api,worker}.{pid,log}`, api first so Flyway runs once at a time); `scripts/split.sh stop` stops them.
