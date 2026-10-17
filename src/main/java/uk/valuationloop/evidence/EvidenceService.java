@@ -110,6 +110,11 @@ public class EvidenceService {
         if (row.isAttached()) {
             throw new Conflict("pack " + packId + " is already attached");
         }
+        // One attached pack per lead. The lead's state table already refuses a second attach (EVIDENCED is not
+        // REPLIED); this check states the rule on its own, since the schema cannot (see V2__evidence_pack.sql).
+        if (packs.existsByLeadIdAndAttachedAtIsNotNull(leadId)) {
+            throw new Conflict("lead " + leadId + " already has an attached pack");
+        }
         if (lead.getState() != LeadState.REPLIED) {
             throw new Conflict("lead " + leadId + " is " + lead.getState() + "; evidence attaches to a reply (REPLIED) once");
         }
