@@ -1,0 +1,8 @@
+# Profile "demo": the simulator and its internal delivery routes (make demo, make replay, make demo-split).
+valuationloop:
+  completion:
+    # The Land Registry Price Paid files lag about two months behind completions, and the demo's CRM reports the
+    # instruction "today", so a 30-day window would never contain a sale that is already in the index. The demo widens
+    # the window to 400 days so the ok scenario's request (itself a real sale, simulator/SimulatorScenarios.okProperty)
+    # can match; that match is the same sale (a self-match, completion/package-info). Production keeps 30 days.
+    lookback-days: 400
