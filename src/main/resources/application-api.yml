@@ -13,5 +13,8 @@ valuationloop:
       auto-startup: false          # lead.deliver.v1 is consumed by the worker
     deadline-scanner:
       enabled: false               # expiry runs in the worker
+  scorecard:
+    listener:
+      auto-startup: true           # the scorecard (group "scorecard") is consumed here, not in the worker
   simulator:
     worker-url: http://127.0.0.1:8090   # demo only: the flaky override and the DLT count live in the worker

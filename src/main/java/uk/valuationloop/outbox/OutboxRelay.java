@@ -52,6 +52,11 @@ public class OutboxRelay {
         this.enabled = enabled;
     }
 
+    /** Whether this process sends outbox rows (valuationloop.outbox.enabled: on in "worker" and one process, off in "api"). */
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     @Scheduled(fixedDelayString = "${valuationloop.outbox.relay-delay-ms:300}")
     public void tick() {
         if (!enabled) {
