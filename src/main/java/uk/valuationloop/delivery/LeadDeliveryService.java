@@ -15,7 +15,7 @@ import uk.valuationloop.request.RequestCloser;
  * really opens a transaction (a @Transactional method called from inside its own class is not proxied). It is also
  * where optimistic-lock conflicts are retried in-process, so they never reach the retry topics or the DLT.
  *
- * Adapter failures are NOT caught: they propagate to the listener, and @RetryableTopic moves the record to the next
+ * Adapter failures (and timeouts, see {@link AdapterCaller}) are NOT caught: they propagate to the listener, and @RetryableTopic moves the record to the next
  * retry topic. That is the whole retry design: the exception is the signal.
  */
 @Service
@@ -26,11 +26,13 @@ public class LeadDeliveryService {
     private final DeliveryTransactions tx;
     private final AdapterRegistry adapters;
     private final RequestCloser closer;
+    private final AdapterCaller caller;
 
-    public LeadDeliveryService(DeliveryTransactions tx, AdapterRegistry adapters, RequestCloser closer) {
+    public LeadDeliveryService(DeliveryTransactions tx, AdapterRegistry adapters, RequestCloser closer, AdapterCaller caller) {
         this.tx = tx;
         this.adapters = adapters;
         this.closer = closer;
+        this.caller = caller;
     }
 
     public void deliver(DeliverLead cmd) {
@@ -39,8 +41,9 @@ public class LeadDeliveryService {
             case Begin.Skip skip -> log.info("DeliverLead {} for lead {} skipped: {}", cmd.eventId(), cmd.leadId(), skip.why());
             case Begin.Attempt attempt -> {
                 CrmAdapter adapter = adapters.forName(cmd.adapter());
-                // leadId is the idempotency key: if this call reached the CRM before a crash, the resend is a no-op there
-                adapter.send(new LeadPush(cmd.leadId(), cmd.requestId(), cmd.agentId()));
+                // leadId is the idempotency key: if this call reached the CRM before a crash, the resend is a no-op there.
+                // The caller enforces valuationloop.delivery.adapter-timeout-ms; a timeout throws like any CRM failure.
+                caller.send(adapter, new LeadPush(cmd.leadId(), cmd.requestId(), cmd.agentId()));
                 OptimisticLockRetry.runVoid(() -> tx.recordDelivered(cmd, attempt.number()));
                 log.info("lead {} delivered via '{}' on attempt {}", cmd.leadId(), cmd.adapter(), attempt.number());
             }

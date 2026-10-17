@@ -39,6 +39,9 @@ valuationloop:
   delivery:
     slow-ms: 2000                  # how long the simulated "slow" CRM adapter takes per call
     flaky-failures: 2              # calls per lead the simulated "flaky" adapter fails before it succeeds
+    partitions: 6                  # lead.deliver.v1 and its -retry-0/-retry-1/-dlt (DeliveryTopics creates or grows them)
+    concurrency: 3                 # DeliverLead consumer threads (each owns 2 of the 6 partitions)
+    adapter-timeout-ms: 5000       # an adapter call slower than this is cut off and counts as a failed attempt
     deadline-scan-ms: 5000         # how often the deadline scanner looks for leads past reply_due_at
     deadline-scanner:
       enabled: true                # off in tests, which drive DeadlineScanner.scanOnce() by hand
