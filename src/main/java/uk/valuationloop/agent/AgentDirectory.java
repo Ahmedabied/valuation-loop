@@ -17,12 +17,12 @@ public class AgentDirectory {
     public record Agent(String id, String name, Set<String> outcodes, String adapter) {}
 
     private static final List<Agent> FIXTURES = List.of(
-            new Agent("ag_fictional_01", "Battersea Bridge Homes",   Set.of("SW11", "SW8"),          "ok"),
-            new Agent("ag_fictional_02", "Clapham Common Lettings",  Set.of("SW4", "SW11", "SW12"),  "slow"),
-            new Agent("ag_fictional_03", "Northcote Property",       Set.of("SW11", "SW12", "SW17"), "flaky"),
-            new Agent("ag_fictional_04", "Brixton Hill Estates",     Set.of("SW2", "SW9", "SE24"),   "ok"),
-            new Agent("ag_fictional_05", "Riverside Wandsworth",     Set.of("SW18", "SW15", "SW11"), "ok"),
-            new Agent("ag_fictional_06", "Kennington Lane Sales",    Set.of("SE11", "SE1", "SW8"),   "slow"));
+            new Agent("ag_fictional_01", "Alder & Finch",            Set.of("SW11", "SW8"),          "ok"),
+            new Agent("ag_fictional_02", "Bramble Lettings",         Set.of("SW4", "SW11", "SW12"),  "slow"),
+            new Agent("ag_fictional_03", "Cobalt Property Co",       Set.of("SW11", "SW12", "SW17"), "flaky"),
+            new Agent("ag_fictional_04", "Dunmore Estates",          Set.of("SW2", "SW9", "SE24"),   "ok"),
+            new Agent("ag_fictional_05", "Elm Row Homes",            Set.of("SW18", "SW15", "SW11"), "ok"),
+            new Agent("ag_fictional_06", "Fennel Sales",             Set.of("SE11", "SE1", "SW8"),   "slow"));
 
     public List<Agent> eligibleFor(String outcode) {
         return FIXTURES.stream().filter(a -> a.outcodes().contains(outcode)).toList();
