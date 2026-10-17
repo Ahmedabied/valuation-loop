@@ -10,6 +10,8 @@
  * days" (400 in the demo profile, application-demo.yml), nothing more. In production the key would be the UPRN / normalised address under the operator's address
  * licence; the demo stores no address, so two flats sold in the same postcode in the same month are
  * indistinguishable to it. And the demo's request postcode is itself taken from a PPD sale, so the "late match" can
- * be that same sale matching itself (H2-review E2-6): it shows the join, not a discovery.
+ * be that same sale matching itself (H2-review E2-6): it shows the join, not a discovery. The pack query finds that
+ * sale too, so the simulated agent removes it from the pack before replying (SimulatorScenarios.comparableToExclude)
+ * and the demo prints the price gap only when the curated pack no longer holds it.
  */
 package uk.valuationloop.completion;

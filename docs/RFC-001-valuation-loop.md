@@ -304,8 +304,9 @@ retention period. The real product would set one by its own policy; this is a kn
   to it. Production puts it behind the platform's agent authentication.
 - **Network.** The API binds to 127.0.0.1, Actuator to 127.0.0.1:8081, Elasticsearch and Kafka to loopback, Postgres to
   127.0.0.1 with a SCRAM password in a mode-600 file.
-- **Internal endpoints.** `/scorecard/snapshot` and `/scorecard/product-query` exist only under the `demo` and `test`
-  profiles (`@Profile`), so a production build does not have the routes at all.
+- **Internal endpoints.** `/scorecard/snapshot`, `/scorecard/product-query` and `/completions/scan` exist only under the
+  `demo` and `test` profiles, `/simulator/*` and `/internal/demo/delivery/*` only under `demo` (`@Profile`), so the app
+  run without those profiles does not have the routes at all.
 - **Responses.** One JSON error shape, `{"error", "message"}`, from `api/ApiErrors`, with no stack traces; every
   response carries `X-Content-Type-Options: nosniff` (`api/NoSniffFilter`).
 
@@ -337,7 +338,7 @@ open-source support on 2026-06-30). What changed and what to watch: `docs/adr/00
 
 - Kafka consumers inside `request` to maintain the seller view. The view is a join.
 - Address-based attribution of CRM outcomes, parked outcomes and a re-attribution pass. The webhook carries `leadRef`.
-- The Land Registry late match. v2.
+- The Land Registry late match. v2 [phase 2 built a postcode-based version; §21].
 - Reply nudges, closing requests on a timer, withdrawn outcomes.
 - A second query merged with the first for missing floor areas. One query with a weight does it.
 - A staging table for sales before Elasticsearch, and an index per data vintage behind an alias.
@@ -370,7 +371,7 @@ open-source support on 2026-06-30). What changed and what to watch: `docs/adr/00
 5. CI with Testcontainers.
 6. Optional EBM sidecar for the comparables range with an error estimate.
 
-Items 2-4 and CI (without Testcontainers) were built on 2026-10-17; §21 says how. Left: 1, Testcontainers, 6.
+Items 1-4 and CI (without Testcontainers) were built on 2026-10-17; §17 and §21 say how. Left: Testcontainers, 6.
 
 ## 21. Phase 2 additions
 
@@ -382,5 +383,8 @@ Items 2-4 and CI (without Testcontainers) were built on 2026-10-17; §21 says ho
 - **Late match.** An instructed lead joins the Price Paid sale at its postcode and type transferred on or after
   (instruction - 30 days). Postcode is not an address (production: UPRN). The demo asks about a flat already sold and
   widens the window to 400 days, so its match is that same sale: a self-match that shows the join, not a discovery.
+  Because the request is a real sale, the pack query also finds that sale (at 0 m); the simulated agent removes it
+  from the pack before replying (a demo artefact; in production the subject has not sold yet), so the reported price
+  gap compares the sale with a range built only from other sales.
 - **Product query** adds `completed` and the median price gap (completed price vs range midpoint), highest vs other.
 - **CI.** GitHub Actions: tests on H2 + embedded Kafka, then the live-Elasticsearch tests on a service container.
