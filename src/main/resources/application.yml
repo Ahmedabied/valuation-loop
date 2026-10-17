@@ -77,6 +77,10 @@ loader:
   codepoint-zip: ../data-raw/codepoint/codepo_gb.zip   # OS Code-Point Open
   codepoint-areas: [sw, se]        # postcode areas to load centroids for
   epc-file: ../data-raw/epc/epc-wandsworth-lambeth.csv # EPC certificates pre-filtered to the two boroughs
+  epc:
+    # The EPC register limits address use to energy-performance purposes. This demo uses EPC addresses only in
+    # memory to join floor area to sales. false: the EPC file is skipped, property type comes from PPD only.
+    enabled: true
   districts: [WANDSWORTH, LAMBETH] # PPD district values to keep
   bulk-size: 1000                  # documents per Elasticsearch bulk request
   stats-outcodes: [SW11, SW4, SW12, SW18, SW2, SW9, SE24, SE11]  # outcodes the range-width sample is drawn from

@@ -14,6 +14,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param codepointZip   OS Code-Point Open zip (Data/CSV/&lt;area&gt;.csv inside)
  * @param codepointAreas postcode areas to load centroids for
  * @param epcFile        EPC certificates already filtered to the two boroughs (tools/epc_filter.py)
+ * @param epc            loader.epc.enabled: false skips the EPC file entirely (no floor area, EPC rating or refined
+ *                       type; property type from PPD only). The EPC register limits address use to energy-performance
+ *                       purposes, so a deployment without its own address licence runs with this off.
  * @param districts      PPD district values to keep
  * @param bulkSize       documents per Elasticsearch bulk request
  * @param statsOutcodes  outcodes the range-width sample is drawn from
@@ -34,5 +37,9 @@ public record LoaderProperties(
         @DefaultValue("1000") int bulkSize,
         @DefaultValue({"SW11", "SW4", "SW12", "SW18", "SW2", "SW9", "SE24", "SE11"}) List<String> statsOutcodes,
         @DefaultValue("400") int statsSample,
-        @DefaultValue("42") long statsSeed) {
+        @DefaultValue("42") long statsSeed,
+        @DefaultValue Epc epc) {
+
+    /** loader.epc.*: whether the EPC join runs at all. */
+    public record Epc(@DefaultValue("true") boolean enabled) {}
 }

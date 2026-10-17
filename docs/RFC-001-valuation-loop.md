@@ -282,10 +282,11 @@ names no agent. On simulated data its output means nothing; on real traffic it i
 - EPC: 90.2% of sales matched to a certificate by a hashed normalised address key held only in loader memory. Only
   OGL-licensed derived fields are indexed (floor area, energy rating, built form, construction age, habitable rooms,
   property type refinement), with the register's OGL attribution in every pack. Address fields are never stored,
-  indexed, logged or committed. The register permits EPC address data only for purposes related to the energy
-  performance of buildings, so using it as a join key, even in memory, is outside that purpose: acceptable for a
-  non-commercial demo is a judgement, and production would join on the portal's own address data instead.
-- In production the portal would use its own address licences; the demo relies on the non-commercial permission.
+  indexed, logged or committed.
+- **The EPC decision.** The EPC register limits use of its address fields to purposes related to the energy
+  performance of buildings. This demo uses EPC addresses only in memory, to join floor area to sales, and is a
+  non-commercial demonstration. A production deployment would use the operator's own address licences (the portal has
+  them) or run with `loader.epc.enabled=false`, which the loader supports.
 - The loader runs under the `loader` profile with Elasticsearch only (`make load`, about 23 s).
 
 **Personal data.** The system holds a pseudonymous `sellerRef` and nothing else about the seller: no names, emails or
