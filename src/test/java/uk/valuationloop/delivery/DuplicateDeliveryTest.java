@@ -73,7 +73,7 @@ class DuplicateDeliveryTest extends DeliveryIntegrationTestBase {
                     assertThat(events.poll(r -> hasLeadId(r, lead.getId()))).hasSize(1));
             var delivered = events.poll(r -> hasLeadId(r, lead.getId())).get(0).value();
             EventSchemas.assertValid(delivered);
-            assertThat(readTree(delivered).get("eventType").asText()).isEqualTo(EventTypes.LEAD_DELIVERED);
+            assertThat(readTree(delivered).get("eventType").asString()).isEqualTo(EventTypes.LEAD_DELIVERED);
         }
     }
 

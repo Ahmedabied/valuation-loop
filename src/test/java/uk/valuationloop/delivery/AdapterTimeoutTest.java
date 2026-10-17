@@ -3,8 +3,8 @@ package uk.valuationloop.delivery;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
@@ -39,7 +39,7 @@ import uk.valuationloop.request.ValuationRequestService;
  * (the relay is off in this context, so the original command is never sent).
  */
 @SpringBootTest
-@EmbeddedKafka(kraft = true, partitions = 6, topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
+@EmbeddedKafka(partitions = 6, topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:adapter_timeout_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
         "valuationloop.outbox.enabled=false",
@@ -116,7 +116,7 @@ class AdapterTimeoutTest {
         String failed = outbox.findAll().stream()
                 .filter(r -> r.getEventType().equals(EventTypes.LEAD_DELIVERY_FAILED) && r.getPayload().contains(lead.getId()))
                 .map(OutboxEvent::getPayload).findFirst().orElseThrow();
-        assertThat(json.readTree(failed).at("/payload/reason").asText()).contains("AdapterTimeout");
-        assertThat(json.readTree(failed).at("/payload/adapter").asText()).isEqualTo("hang");
+        assertThat(json.readTree(failed).at("/payload/reason").asString()).contains("AdapterTimeout");
+        assertThat(json.readTree(failed).at("/payload/adapter").asString()).isEqualTo("hang");
     }
 }

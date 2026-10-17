@@ -3,7 +3,7 @@ package uk.valuationloop.outbox;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -27,7 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest(properties = // its own in-memory database, never shared with another test context
         "spring.datasource.url=jdbc:h2:mem:outbox_relay_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
-@EmbeddedKafka(kraft = true, partitions = 1, topics = Topics.LEAD_EVENTS)
+@EmbeddedKafka(partitions = 1, topics = Topics.LEAD_EVENTS)
 class OutboxRelayTest {
 
     @Autowired OutboxWriter writer;
@@ -42,7 +42,7 @@ class OutboxRelayTest {
     @BeforeEach
     void setUp() {
         repository.deleteAll();
-        Map<String, Object> props = KafkaTestUtils.consumerProps("outbox-test-" + System.nanoTime(), "false", broker);
+        Map<String, Object> props = KafkaTestUtils.consumerProps(broker, "outbox-test-" + System.nanoTime(), false);
         consumer = new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new StringDeserializer()).createConsumer();
         broker.consumeFromAnEmbeddedTopic(consumer, Topics.LEAD_EVENTS);
     }

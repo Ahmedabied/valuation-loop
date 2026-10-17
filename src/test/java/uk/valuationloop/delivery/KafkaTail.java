@@ -24,7 +24,7 @@ public class KafkaTail implements AutoCloseable {
 
     private KafkaTail(EmbeddedKafkaBroker broker, boolean fromEnd, String... topics) {
         consumer = new DefaultKafkaConsumerFactory<>(
-                KafkaTestUtils.consumerProps("tail-" + System.nanoTime(), "false", broker),
+                KafkaTestUtils.consumerProps(broker, "tail-" + System.nanoTime(), false),
                 new StringDeserializer(), new StringDeserializer()).createConsumer();
         List<TopicPartition> partitions = new ArrayList<>();
         for (String topic : topics) {

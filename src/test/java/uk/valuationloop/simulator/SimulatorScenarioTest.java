@@ -31,7 +31,7 @@ import uk.valuationloop.simulator.ScenarioReport.LeadLine;
  */
 @SpringBootTest
 @ActiveProfiles({"test", "demo"})
-@EmbeddedKafka(kraft = true, partitions = 1,
+@EmbeddedKafka(partitions = 1,
         topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER, Topics.LEAD_EVENTS, Topics.OUTCOME_RECORDED})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:simulator_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
