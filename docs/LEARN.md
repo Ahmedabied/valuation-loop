@@ -80,6 +80,9 @@ Follow `POST /valuation-requests` for a flat in SW11 until it shows up on the ag
    `requests.post` to a third-party API, kept outside `atomic()` on purpose.
 9. **Reply.** `response/AgentLeadController.reply` then `ReplyService.reply`: the range, `LeadReplied` and the
    request's move to `REPLIES_IN` in one transaction; a second reply is 409. `GET .../contact` is 423 until then.
+   Closure: `request/RequestCloser` closes a request (`ALL_LEADS_TERMINAL`) only when every lead is terminal and none
+   replied; the deadline scanner and the DLT handler both call it. With any reply the request waits in `REPLIES_IN`
+   for the seller's selection.
 10. **Evidence.** `evidence/EvidenceController` then `EvidenceService.build`, `EvidencePackBuilder`,
     `EsComparablesSearch` running `ComparablesQuery`; the agent removes comparables and calls `attach`, which writes
     `EvidenceAttached`. Django: a view calling an Elasticsearch client directly, no ORM in between.

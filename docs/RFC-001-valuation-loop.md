@@ -122,8 +122,8 @@ terminal and none replied. Two places check it: the deadline scanner after it ex
 after a lead becomes `DELIVERY_FAILED` (so a request whose every CRM failed closes too;
 `delivery/DeliveryRetryAndDltTest.aRequestWhoseOnlyLeadFailsDeliveryCloses`). If any lead replied, the request stays `REPLIES_IN` until the seller selects
 (reason `SELLER_SELECTED`). Code: `request/RequestCloser`; test:
-`delivery/DeadlineScannerTest.aRequestWithAReplyStaysOpenWhenTheOtherLeadsExpire`. This is also listed in §19 for
-the owner to confirm.
+`delivery/DeadlineScannerTest.aRequestWithAReplyStaysOpenWhenTheOtherLeadsExpire`. Confirmed by the owner on
+2026-10-17 (§19, question 1).
 
 ## 6. Events and topics
 
@@ -349,9 +349,9 @@ imports (Jackson 3 moves to `tools.jackson`), spring-kafka 4.x and the Elasticse
 
 ## 19. Open questions for the owner
 
-1. **Closure rule.** Confirm: `ALL_LEADS_TERMINAL` only when every lead is terminal and none replied; with any reply
-   the request waits in `REPLIES_IN` for the seller. Should a request with replies but no selection ever close on its
-   own, and after how long?
+1. **Closure rule.** Decided 2026-10-17 (§5): `ALL_LEADS_TERMINAL` only when every lead is terminal and none
+   replied, checked by the deadline scanner and the DLT handler; with any reply the request waits in `REPLIES_IN` for
+   the seller. Open: should a request with replies but no selection ever close on its own, and after how long?
 2. **One attached pack per lead.** Enforced in `EvidenceService.attach` and by the lead's state table, because H2 cannot
    run the partial unique index (`unique (lead_id) where attached_at is not null`). Should Postgres also get the
    index, as a Postgres-only migration?
