@@ -39,7 +39,9 @@ import uk.valuationloop.support.EventSchemas;
  * The agent's evidence API over HTTP (MockMvc), H2 for the database, in-memory fakes instead of Elasticsearch.
  * build -> exclude -> attach, plus every way attach and curation must refuse.
  */
-@SpringBootTest(properties = "spring.kafka.listener.auto-startup=false")
+@SpringBootTest(properties = {"spring.kafka.listener.auto-startup=false",
+        // its own in-memory database, never shared with another test context
+        "spring.datasource.url=jdbc:h2:mem:evidence_api_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"})
 @AutoConfigureMockMvc
 @Import(EvidenceApiTest.FakeSources.class)
 class EvidenceApiTest {
