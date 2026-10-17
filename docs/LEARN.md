@@ -19,7 +19,7 @@ against RFC §7 only after you have written it.
 ## Learn day 2
 
 **Morning.** Add one small feature end to end without help (see "The day 2 feature" below). Claude reviews only.
-**Afternoon.** The 23 interview questions, out loud, then in writing. Rewrite the RFC's first page in your words.
+**Afternoon.** The 28 interview questions, out loud, then in writing. Rewrite the RFC's first page in your words.
 **Evening.** Decide the application text and the AI answer (draft at the end). Nothing is sent without your yes.
 
 ## Reading order
@@ -221,7 +221,7 @@ make each step's test pass before the next:
 Alternative: a new simulator scenario, for example `two-sellers` (two requests in the same outcode at once), added to
 `SimulatorScenarios.NAMES` and `run`, with a check in `simulator/SimulatorScenarioTest`.
 
-## 23 interview questions
+## 28 interview questions
 
 Model answers are short on purpose. Rewrite each in your own words before the interview; do not memorise these.
 
@@ -314,6 +314,37 @@ Model answers are short on purpose. Rewrite each in your own words before the in
     through Kafka topics and one Postgres. Profiles give one artefact, one schema, one test suite, and the split stays a
     deployment decision I can undo with a flag. Two modules pay off when teams or release cycles differ; here they would
     add a shared-library module and duplicated config for no gain. `ApiWorkerProfilesTest` proves the wiring.
+
+Questions 24 to 28 were added by review 2 (2026-10-17): the five a backend engineer on the team would most likely
+push on that 1 to 23 did not cover.
+
+24. **A CRM times out on the third attempt but did accept the lead. What then?** (added by review 2) The lead is
+    `DELIVERY_FAILED` and `LeadDeliveryFailed` is written, while the CRM holds the lead. Earlier timed-out attempts are
+    harmless, because the retry resends the same `leadId` and the CRM dedupes on it (`FakeCrm`). The last one is a
+    real gap in v1: nothing reconciles it. Production would ask the CRM for the lead's status by `leadId` before
+    giving up, or take the CRM's own delivery callback as the truth.
+25. **Your late match matches the request to itself. What does the price gap mean?** (added by review 2) In the demo,
+    nothing yet: the ok request is built from a real sale, so the match is that sale (a staged self-match that shows
+    the join, not a discovery; `completion/package-info`). The pack query also finds that sale at 0 m, so the
+    simulated agent removes it before replying (`SimulatorScenarios.comparableToExclude`), otherwise the range would
+    contain the answer. What is left is "the sale price vs the midpoint of a range built from other sales". In
+    production the request comes before the sale, the key is the UPRN, not postcode + type, and the gap only means
+    something as a median over many leads, split as the product query does.
+26. **The scorecard projector throws on a valid event (Postgres down). What happens?** (added by review 2) The
+    scorecard listener has no error handler of its own, so spring-kafka's default applies: 10 attempts with no back
+    off, then it logs an error and commits the offset. The event stays on the topic, but the fact misses it until the
+    next `make replay`. That is the honest weak spot of the read model; the fix is a blocking back-off (or a
+    scorecard DLT) for that container, so a database outage pauses the consumer instead of skipping events.
+27. **How do you change an event without breaking replay?** (added by review 2) Additive changes only, in place: a
+    new optional field, which old consumers ignore. A breaking change gets a new `schemaVersion` (or a `.v2` topic)
+    and the projector handles both versions, because replay reads the whole history from offset 0 and old events
+    never change (`docs/EVENTS.md`). `outbox/EventSchemasTest` validates emitted events against their schema files, so a
+    change to a schema shows up there first.
+28. **What happens to sellers' requests while the worker is down?** (added by review 2) The api still commits the
+    request, its leads and their outbox rows; nothing is lost and the seller gets a 201. Nothing is sent: the only
+    relay runs in the worker, so the rows wait, and `outbox_unsent` (on the worker's 8091, sampled only there) shows
+    them once it is back. Delivery, retries and the deadline scanner resume with it; the reply window starts at
+    delivery, so a lead is not expired for time the worker was down.
 
 ## What I would say about AI pairing (draft, Ahmed decides)
 
