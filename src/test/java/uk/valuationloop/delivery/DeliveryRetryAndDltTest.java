@@ -59,7 +59,7 @@ class DeliveryRetryAndDltTest extends DeliveryIntegrationTestBase {
         List<String> closed = outboxEventsForRequest(EventTypes.REQUEST_CLOSED, requestId);
         assertThat(closed).hasSize(1);
         EventSchemas.assertValid(closed.get(0));
-        assertThat(readTree(closed.get(0)).at("/payload/reason").asText()).isEqualTo("ALL_LEADS_TERMINAL");
+        assertThat(readTree(closed.get(0)).at("/payload/reason").asString()).isEqualTo("ALL_LEADS_TERMINAL");
     }
 
     @Test
@@ -108,10 +108,10 @@ class DeliveryRetryAndDltTest extends DeliveryIntegrationTestBase {
                 EventSchemas.assertValid(r.value());
             }
             var failed = mine.stream().map(r -> readTree(r.value()))
-                    .filter(e -> e.get("eventType").asText().equals(EventTypes.LEAD_DELIVERY_FAILED)).findFirst().orElseThrow();
+                    .filter(e -> e.get("eventType").asString().equals(EventTypes.LEAD_DELIVERY_FAILED)).findFirst().orElseThrow();
             assertThat(failed.at("/payload/attempts").asInt()).isEqualTo(3);
-            assertThat(failed.at("/payload/adapter").asText()).isEqualTo("flaky");
-            assertThat(failed.at("/payload/reason").asText()).contains("CrmUnavailable");
+            assertThat(failed.at("/payload/adapter").asString()).isEqualTo("flaky");
+            assertThat(failed.at("/payload/reason").asString()).contains("CrmUnavailable");
         }
     }
 }

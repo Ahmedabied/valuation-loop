@@ -1,6 +1,6 @@
 package uk.valuationloop.outbox;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -130,7 +130,7 @@ public class OutboxRelay {
         /** The traceparent the envelope was written with, so this send logs under the request's traceId. */
         private String traceparentOf(OutboxEvent row) {
             try {
-                return objectMapper.readTree(row.getPayload()).path("traceparent").asText(null);
+                return objectMapper.readTree(row.getPayload()).path("traceparent").asString(null);
             } catch (Exception e) {
                 return null;   // not our envelope shape: send it anyway, just without a trace
             }

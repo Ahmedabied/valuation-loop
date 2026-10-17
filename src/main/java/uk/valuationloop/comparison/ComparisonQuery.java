@@ -1,8 +1,8 @@
 package uk.valuationloop.comparison;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -85,7 +85,7 @@ public class ComparisonQuery {
         }
         try {
             return objectMapper.readTree(packJson);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("stored evidence pack is not JSON", e);
         }
     }

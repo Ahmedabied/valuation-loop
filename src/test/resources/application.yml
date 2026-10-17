@@ -1,5 +1,5 @@
 # Test profile: no Postgres, no external Kafka. H2 runs the same Flyway migrations in PostgreSQL mode;
-# @EmbeddedKafka(kraft = true) provides the broker and sets spring.embedded.kafka.brokers.
+# @EmbeddedKafka (KRaft, the only mode in spring-kafka 4) provides the broker and sets spring.embedded.kafka.brokers.
 spring:
   profiles:
     active: test                   # turns on the test/demo-only beans (ScorecardInternalController)

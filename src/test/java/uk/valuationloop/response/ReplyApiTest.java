@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,7 +62,7 @@ class ReplyApiTest extends DeliveryIntegrationTestBase {
         assertThat(events).hasSize(1);
         EventSchemas.assertValid(events.get(0).toString());
         assertThat(events.get(0).at("/payload/late").asBoolean()).isFalse();
-        assertThat(events.get(0).at("/payload/deliveredAt").asText()).isNotBlank();
+        assertThat(events.get(0).at("/payload/deliveredAt").asString()).isNotBlank();
         assertThat(requests.findById(requestId).orElseThrow().getState()).isEqualTo(RequestState.REPLIES_IN);
 
         // the second reply is a conflict, not a second fact
@@ -112,11 +112,11 @@ class ReplyApiTest extends DeliveryIntegrationTestBase {
         String requestId = deliveredRequest("seller-reply-4");
         String leadId = leadOf(requestId, AGENT).getId();
 
-        reply(AGENT, leadId, "{\"low\": 600000, \"high\": 500000}").andExpect(status().isUnprocessableEntity());
-        reply(AGENT, leadId, "{\"low\": 0, \"high\": 500000}").andExpect(status().isUnprocessableEntity());
-        reply(AGENT, leadId, "{\"low\": -5, \"high\": 500000}").andExpect(status().isUnprocessableEntity());
-        reply(AGENT, leadId, "{\"high\": 500000}").andExpect(status().isUnprocessableEntity());
-        reply(AGENT, leadId, "{\"low\": 500000.50, \"high\": 600000}").andExpect(status().isUnprocessableEntity());
+        reply(AGENT, leadId, "{\"low\": 600000, \"high\": 500000}").andExpect(status().isUnprocessableContent());
+        reply(AGENT, leadId, "{\"low\": 0, \"high\": 500000}").andExpect(status().isUnprocessableContent());
+        reply(AGENT, leadId, "{\"low\": -5, \"high\": 500000}").andExpect(status().isUnprocessableContent());
+        reply(AGENT, leadId, "{\"high\": 500000}").andExpect(status().isUnprocessableContent());
+        reply(AGENT, leadId, "{\"low\": 500000.50, \"high\": 600000}").andExpect(status().isUnprocessableContent());
 
         assertThat(leadOf(requestId, AGENT).getState()).isEqualTo(LeadState.DELIVERED);
         assertThat(outboxEvents(EventTypes.LEAD_REPLIED, leadId)).isEmpty();

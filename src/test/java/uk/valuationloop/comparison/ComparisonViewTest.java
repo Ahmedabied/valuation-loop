@@ -6,7 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.sql.Timestamp;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -104,9 +104,9 @@ class ComparisonViewTest extends LoopApiTestBase {
         assertThat(engaged.get(0).getTopic()).isEqualTo(Topics.LEAD_EVENTS);
         EventSchemas.assertValid(engaged.get(0).getPayload());
         JsonNode engagedEnvelope = tree(engaged.get(0).getPayload());
-        assertThat(engagedEnvelope.path("leadId").asText()).isEqualTo(firstLead);
-        assertThat(engagedEnvelope.path("agentId").asText()).isEqualTo(FIRST);
-        assertThat(engagedEnvelope.at("/payload/action").asText()).isEqualTo("CONTACTED");
+        assertThat(engagedEnvelope.path("leadId").asString()).isEqualTo(firstLead);
+        assertThat(engagedEnvelope.path("agentId").asString()).isEqualTo(FIRST);
+        assertThat(engagedEnvelope.at("/payload/action").asString()).isEqualTo("CONTACTED");
         engage(requestId, "ld_not_in_this_request", "VIEWED").andExpect(status().isNotFound());
 
         // selection closes the request: SellerSelected + RequestClosed {SELLER_SELECTED}, both schema-valid
@@ -119,12 +119,12 @@ class ComparisonViewTest extends LoopApiTestBase {
         assertThat(selected).hasSize(1);
         assertThat(selected.get(0).getTopic()).isEqualTo(Topics.LEAD_EVENTS);
         EventSchemas.assertValid(selected.get(0).getPayload());
-        assertThat(tree(selected.get(0).getPayload()).path("leadId").asText()).isEqualTo(firstLead);
+        assertThat(tree(selected.get(0).getPayload()).path("leadId").asString()).isEqualTo(firstLead);
         List<OutboxEvent> closed = outboxRows(EventTypes.REQUEST_CLOSED, requestId);
         assertThat(closed).hasSize(1);
         assertThat(closed.get(0).getTopic()).isEqualTo(Topics.VALUATION_REQUESTED);
         EventSchemas.assertValid(closed.get(0).getPayload());
-        assertThat(tree(closed.get(0).getPayload()).at("/payload/reason").asText()).isEqualTo("SELLER_SELECTED");
+        assertThat(tree(closed.get(0).getPayload()).at("/payload/reason").asString()).isEqualTo("SELLER_SELECTED");
 
         // a second selection is a conflict and writes nothing
         select(requestId, secondLead).andExpect(status().isConflict());

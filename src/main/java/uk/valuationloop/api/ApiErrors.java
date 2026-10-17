@@ -73,7 +73,7 @@ public class ApiErrors {
     @ExceptionHandler({IllegalArgumentException.class, ValuationRequestService.NoEligibleAgents.class,
             ReplyService.InvalidReply.class, EvidencePackBuilder.UnknownPostcode.class})
     public ResponseEntity<ApiError> invalid(RuntimeException e) {
-        return body(HttpStatus.UNPROCESSABLE_ENTITY, "invalid", e.getMessage());
+        return body(HttpStatus.UNPROCESSABLE_CONTENT, "invalid", e.getMessage());
     }
 
     /** A failed @Valid on a request body: list the fields and the rule, never the rejected values. */
@@ -83,7 +83,7 @@ public class ApiErrors {
                 .map(f -> f.getField() + " " + f.getDefaultMessage())
                 .sorted()
                 .collect(Collectors.joining("; "));
-        return body(HttpStatus.UNPROCESSABLE_ENTITY, "invalid", fields.isEmpty() ? "request body is invalid" : fields);
+        return body(HttpStatus.UNPROCESSABLE_CONTENT, "invalid", fields.isEmpty() ? "request body is invalid" : fields);
     }
 
     @ExceptionHandler(ReplyService.ContactLocked.class)
