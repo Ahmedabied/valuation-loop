@@ -94,7 +94,7 @@ class ComparisonViewTest extends LoopApiTestBase {
         // nothing about the lead that failed: not listed, not counted, no word for it
         assertThat(body).doesNotContain(failedLead).doesNotContain(FAILS)
                 .doesNotContainIgnoringCase("fail").doesNotContainIgnoringCase("expire")
-                .doesNotContainIgnoringCase("late").doesNotContainIgnoringCase("overdue")
+                .doesNotContainIgnoringCase("late").doesNotContainIgnoringCase("deadline")
                 .doesNotContainIgnoringCase("score");
 
         // engagement: 202 and a schema-valid SellerEngaged keyed by requestId, with leadId + agentId
