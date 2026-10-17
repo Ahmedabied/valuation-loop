@@ -57,8 +57,12 @@ kafka-up:
 	  (KAFKA_HEAP_OPTS="-Xms256m -Xmx512m" nohup $(KAFKA_HOME)/bin/kafka-server-start.sh $(KAFKA_DATA)/server.properties > $(LOGS)/kafka.log 2>&1 & \
 	   for i in $$(seq 1 30); do $(KAFKA_HOME)/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 && break; sleep 1; done; echo "kafka up on 9092")
 
-kafka-down:
-	@pkill -f "[k]afka.Kafka $(KAFKA_DATA)" && echo "kafka stopped" || echo "kafka not running"
+kafka-down:   # waits (up to 30 s) until the broker has really exited, so a kafka-up right after does not race it
+	@if pkill -f "[k]afka.Kafka $(KAFKA_DATA)"; then \
+	  for i in $$(seq 1 30); do pgrep -f "[k]afka.Kafka $(KAFKA_DATA)" >/dev/null || break; sleep 1; done; \
+	  if pgrep -f "[k]afka.Kafka $(KAFKA_DATA)" >/dev/null; then echo "kafka still running after 30 s"; exit 1; fi; \
+	  echo "kafka stopped"; \
+	else echo "kafka not running"; fi
 
 # ---------- Elasticsearch (single node, security off for local) ----------
 es-up:
@@ -67,8 +71,12 @@ es-up:
 	  (ES_JAVA_OPTS="-Xms512m -Xmx1g" nohup $(ES_HOME)/bin/elasticsearch -E discovery.type=single-node -E network.host=127.0.0.1 -E xpack.security.enabled=false -E xpack.ml.enabled=false -E http.port=9200 > $(LOGS)/es.log 2>&1 & \
 	   for i in $$(seq 1 60); do curl -s localhost:9200 >/dev/null 2>&1 && break; sleep 2; done; curl -s localhost:9200 | grep -o '"number" : "[^"]*"' | head -1; echo "es up on 9200")
 
-es-down:
-	@pkill -f "[o]rg.elasticsearch.bootstrap.Elasticsearch" && echo "es stopped" || echo "es not running"
+es-down:      # waits (up to 30 s) until Elasticsearch has really exited
+	@if pkill -f "[o]rg.elasticsearch.bootstrap.Elasticsearch"; then \
+	  for i in $$(seq 1 30); do pgrep -f "[o]rg.elasticsearch.bootstrap.Elasticsearch" >/dev/null || break; sleep 1; done; \
+	  if pgrep -f "[o]rg.elasticsearch.bootstrap.Elasticsearch" >/dev/null; then echo "es still running after 30 s"; exit 1; fi; \
+	  echo "es stopped"; \
+	else echo "es not running"; fi
 
 # ---------- Postgres (user-space binaries, no root) ----------
 # Listens on 127.0.0.1 only; TCP needs the scram password in $(PG_PWFILE) (mode 600, generated once);
