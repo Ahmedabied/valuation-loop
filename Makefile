@@ -1,6 +1,9 @@
 # Single entry point for running Valuation Loop on this box (no Docker). See ../HANDOFF.md §6.
 SHELL := /bin/bash
 export JAVA_HOME ?= $(HOME)/jdks/jdk-21.0.12.1+1
+# the JDK 21 toolchain Gradle compiles and tests with (gradle.properties: installations.fromEnv), even when the
+# Gradle daemon itself runs on another JDK
+export JDK21_HOME ?= $(JAVA_HOME)
 # Gradle's own JVM kept small: other sessions share this 15 GB box (a jvmargs change starts a separate daemon)
 GRADLE := ./gradlew -Dorg.gradle.jvmargs="-Xmx768m -XX:MaxMetaspaceSize=384m"
 APP_JAR := build/libs/valuation-loop-0.1.0-SNAPSHOT.jar

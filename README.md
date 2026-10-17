@@ -94,14 +94,17 @@ these paths; override the variables at the top of the Makefile if yours differ.
 
 | Thing | Where the Makefile looks |
 |---|---|
-| JDK 21 | `~/jdks/jdk-21.0.12.1+1` (`JAVA_HOME` is set by the Makefile) |
+| JDK 21 | `~/jdks/jdk-21.0.12.1+1` by default; export `JAVA_HOME` to yours (the Makefile's default is that path) |
 | Kafka 4.3.1 (KRaft) | `~/tools/kafka_2.13-4.3.1`, data in `~/tools/kafka-data` |
 | Elasticsearch 8.19.4 | `~/tools/elasticsearch-8.19.4` (single node, security off, loopback only) |
 | Postgres 18 | `~/tools/postgres` binaries, cluster in `~/tools/pgdata`, port 5433 |
 | Data (only for `make load`) | `../data-raw/ppd/pp-2024.csv`, `pp-2025.csv`, `pp-2026.csv`; `../data-raw/codepoint/codepo_gb.zip`; `../data-raw/epc/epc-wandsworth-lambeth.csv` |
 | Memory | about 4 GB free for Postgres + Kafka (512 MB heap) + Elasticsearch (1 GB heap) + the app |
 
-Gradle comes from the wrapper (`./gradlew`, Gradle 8.14.3).
+Gradle comes from the wrapper (`./gradlew`, Gradle 8.14.3). Export `JAVA_HOME` to a JDK 21 before running
+`./gradlew` directly. The build's JDK 21 toolchain is found via the `JDK21_HOME` environment variable, defaulting to
+`JAVA_HOME` (`gradle.properties`: `org.gradle.java.installations.fromEnv=JDK21_HOME,JAVA_HOME`; the Makefile exports
+`JDK21_HOME` = `JAVA_HOME`), so the Gradle daemon itself may run on another JDK.
 
 ### Steps
 
