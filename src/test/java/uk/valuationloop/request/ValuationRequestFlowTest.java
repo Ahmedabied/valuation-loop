@@ -122,6 +122,29 @@ class ValuationRequestFlowTest {
     }
 
     @Test
+    void theSameAgentSelectedTwiceGetsOneLead() throws Exception {
+        String body = json.writeValueAsString(Map.of(
+                "sellerRef", "seller-test-dup", "postcode", "SW11 6ED", "propertyType", "FLAT", "bedrooms", 2,
+                "selectedAgentIds", java.util.List.of("ag_fictional_01", "ag_fictional_01")));
+        mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.leads.length()").value(1));   // one lead per agent, not a 500 from the unique key
+    }
+
+    @Test
+    void anUnknownSelectedAgentIs422AndItsIdIsNotEchoedAsMarkup() throws Exception {
+        String body = json.writeValueAsString(Map.of(
+                "sellerRef", "seller-test-4", "postcode", "SW11 6ED", "propertyType", "FLAT", "bedrooms", 2,
+                "selectedAgentIds", java.util.List.of("<script>x</script>")));
+        mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<"))));
+        mvc.perform(get("/valuation-requests/{id}", "<b>x"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("no request ?b?x"));
+    }
+
+    @Test
     void outcodeWithNoSlotHolderIs422AndWritesNothing() throws Exception {
         String body = json.writeValueAsString(Map.of(
                 "sellerRef", "seller-test-3", "postcode", "M20 4AP", "propertyType", "FLAT", "bedrooms", 1));
