@@ -81,7 +81,7 @@ public class ValuationRequestService {
         for (Agent agent : eligible) {
             AgentLead lead = leads.save(AgentLead.create(request.getId(), agent.id(), now));   // the managed copy, as above
             created.add(lead);
-            // the command the delivery worker acts on; keyed by leadId so one slow agent never blocks another
+            // the command the delivery worker acts on; keyed by leadId so leads can spread over partitions
             outbox.write(Topics.LEAD_DELIVER, lead.getId(), EventEnvelope.of(EventTypes.DELIVER_LEAD,
                     request.getId(), lead.getId(), agent.id(), Map.of("adapter", agent.adapter())));
         }

@@ -228,9 +228,11 @@ Model answers are short on purpose. Rewrite each in your own words before the in
 4. **How is ordering kept?** Per key. Everything about one request is keyed by `requestId`, so it lands on one partition
    and one consumer sees it in order. The relay stops a batch on a failed send so later rows do not overtake. Across
    requests there is no order and none is needed.
-5. **Why is DeliverLead keyed by leadId but events by requestId?** Delivery is per agent: keying by lead spreads one
-   request's leads over partitions, so one flaky CRM's retries never delay another agent. Events are per request: the
-   scorecard needs them in order for a request.
+5. **Why is DeliverLead keyed by leadId but events by requestId?** Delivery is per agent: keying by lead lets one
+   request's leads spread over partitions and listener threads, and keeps every copy of one lead's command in order.
+   Events are per request: the scorecard needs them in order for a request. Be honest about v1: one partition and one
+   listener thread, so a slow CRM delays the leads behind it (the `slow` scenario shows it); the fix is partitions,
+   concurrency and a per-CRM timeout.
 6. **Why no ranking of agents?** Agents are the paying customers, and a platform verdict on a named agent built on this
    data is a claim nothing could back. Technically, comparables disagree by a median 28% of value, so a 5 to 10%
    difference between two agents is noise. Eligibility is a lookup; the seller sees evidence in reply order.
@@ -264,7 +266,7 @@ Model answers are short on purpose. Rewrite each in your own words before the in
     day 1: version lines, Jackson 3 imports, spring-kafka 4.x, the Elasticsearch client line.
 17. **How do retries avoid blocking other leads?** Non-blocking retry topics: a failed record is re-published to
     `-retry-0` with a delay and the main partition moves on. Lock conflicts are retried in process and never reach the
-    retry topics.
+    retry topics. What they do not fix is a slow call: it holds the listener thread while it runs (see question 5).
 18. **How do you test Kafka without Docker?** `@EmbeddedKafka(kraft = true)` runs a broker in the test JVM; H2 in
     PostgreSQL mode runs the same Flyway migrations. The two Elasticsearch tests need a real node and run with
     `-Pes=true`.

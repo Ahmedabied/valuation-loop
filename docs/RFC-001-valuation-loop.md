@@ -142,8 +142,11 @@ off-by-one: 3 attempts is one try on the main topic plus 2 retries, so the topic
 `delivery/DeliveryRetryAndDltTest.springKafkaCreatedTheRetryAndDltTopicsWithTheseNames` pins the real names.
 
 **Keys.** Everything about one request is keyed by `requestId`, so it lands on one partition and the scorecard sees it
-in order. `DeliverLead` is keyed by `leadId` so that deliveries for different agents spread across partitions and one
-agent's retries never hold up another agent's lead.
+in order. `DeliverLead` is keyed by `leadId` so that, with several partitions and listener threads, deliveries for
+different agents spread out. A failed delivery never holds up the leads behind it: it waits for its retry on a retry
+topic. A slow one does, in v1: the adapter call blocks the listener thread, and the local topic has one partition and
+one consumer thread, so the demo's `slow` scenario shows an `ok` lead queued behind a 2 s CRM. Production needs more
+partitions, listener concurrency and a per-CRM timeout (a bulkhead), not a different key.
 
 ## 7. The outbox
 

@@ -29,8 +29,9 @@ import uk.valuationloop.outbox.Topics;
  *   lead.deliver.v1-retry-1  attempt 3  --fails-->  lead.deliver.v1-dlt      -> onDeadLetter: DELIVERY_FAILED
  * </pre>
  *
- * "Non-blocking": a failing record is re-published to the next topic and the partition moves on, so one flaky CRM
- * never holds up the leads behind it. spring-kafka creates the extra topics and listeners from the annotation.
+ * "Non-blocking": a failing record is re-published to the next topic and the partition moves on, so a flaky CRM's
+ * waits between attempts never hold up the leads behind it. (A slow call still does while it runs: see SlowAdapter.)
+ * spring-kafka creates the extra topics and listeners from the annotation.
  *
  * Shape (H2-review E2-5): this method is NOT @Transactional. It calls the service (which commits its own
  * transactions through Spring's proxy) and returns; the container then commits the offset (ack-mode: record).
