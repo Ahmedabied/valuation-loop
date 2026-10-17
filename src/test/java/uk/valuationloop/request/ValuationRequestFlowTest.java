@@ -31,6 +31,7 @@ import uk.valuationloop.lead.AgentLeadRepository;
 import uk.valuationloop.outbox.OutboxRelay;
 import uk.valuationloop.outbox.OutboxRepository;
 import uk.valuationloop.outbox.Topics;
+import uk.valuationloop.support.EventSchemas;
 
 /** POST a request -> one lead per slot holder -> one DeliverLead command per lead on the wire, keyed by leadId. */
 @SpringBootTest
@@ -88,6 +89,7 @@ class ValuationRequestFlowTest {
         int requestEvents = 0;
         for (ConsumerRecord<String, String> r : KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10))) {
             JsonNode env = json.readTree(r.value());
+            EventSchemas.assertValid(r.value()); // the already-emitted events must match the shared contract
             if (r.topic().equals(Topics.LEAD_DELIVER)) {
                 assertThat(env.get("eventType").asText()).isEqualTo("DeliverLead");
                 assertThat(r.key()).isEqualTo(env.get("leadId").asText());
