@@ -30,5 +30,10 @@ transaction and throws if no transaction is active. `OutboxRelay` ticks every 30
   than 1 s to reach the topic.
 - About 250 lines of code to own: the table, the entity, the writer, the relay, the envelope.
 - A crash after the send and before `sent_at` commits sends the row again. That is by design; consumers absorb it.
-- No ordering beyond the key and the creation order of rows; a failed send stops the batch so later rows wait.
+- No ordering beyond the key and the creation order of rows (`created_at`, then the UUIDv7 `id`, so events written
+  in the same instant keep their write order: `OutboxOrderingTest`); a failed send stops the batch so later rows wait.
+- The relay holds one database transaction open across the Kafka sends of a batch, so the row locks and the
+  connection are held while it waits on the broker. That keeps it simple and explainable, and it is bounded by the
+  10 s send timeout and the batch size; a v2 relay would claim rows, then send outside the transaction, then mark
+  them sent.
 - No archive or clean-up of sent rows in v1. Production needs a deletion job or partitioning.
