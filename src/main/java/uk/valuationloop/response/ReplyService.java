@@ -2,15 +2,19 @@ package uk.valuationloop.response;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import uk.valuationloop.lead.AgentLead;
 import uk.valuationloop.lead.AgentLeadRepository;
 import uk.valuationloop.lead.LeadState;
+import uk.valuationloop.observability.LoopMetrics;
 import uk.valuationloop.outbox.EventEnvelope;
 import uk.valuationloop.outbox.EventTypes;
 import uk.valuationloop.outbox.OutboxWriter;
@@ -43,12 +47,15 @@ public class ReplyService {
     private final ValuationRequestRepository requests;
     private final OutboxWriter outbox;
     private final Clock clock;
+    private final LoopMetrics metrics;
 
-    public ReplyService(AgentLeadRepository leads, ValuationRequestRepository requests, OutboxWriter outbox, Clock clock) {
+    public ReplyService(AgentLeadRepository leads, ValuationRequestRepository requests, OutboxWriter outbox, Clock clock,
+                        LoopMetrics metrics) {
         this.leads = leads;
         this.requests = requests;
         this.outbox = outbox;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /**
@@ -84,7 +91,26 @@ public class ReplyService {
         if (request.getState() == RequestState.AWAITING_REPLIES) {
             request.apply(new RequestEvent.FirstReply(), now);   // later replies leave REPLIES_IN as it is
         }
+        recordReplyMinutesAfterCommit(lead);
         return lead;
+    }
+
+    /**
+     * reply_minutes (delivery -> reply) goes to the metric only once the transaction commits: if the commit fails,
+     * or an optimistic-lock conflict makes the controller run reply() again, the metric is not counted twice.
+     * (TransactionSynchronization: a callback Spring runs at commit, like Django's transaction.on_commit.)
+     */
+    private void recordReplyMinutesAfterCommit(AgentLead lead) {
+        if (lead.getDeliveredAt() == null) {
+            return;
+        }
+        double minutes = Duration.between(lead.getDeliveredAt(), lead.getRepliedAt()).toMillis() / 60_000.0;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                metrics.replyMinutes(minutes);
+            }
+        });
     }
 
     /**

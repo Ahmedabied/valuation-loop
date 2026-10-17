@@ -3,6 +3,7 @@ package uk.valuationloop.outbox;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import uk.valuationloop.observability.EventTracing;
 
 /**
  * The JSON envelope every event travels in (ARCHITECTURE.md §4).
@@ -26,8 +27,11 @@ public record EventEnvelope(
                                  currentTraceparent(), payload);
     }
 
-    /** Filled by the tracing bridge when a span is active; null is fine, it just means "no trace". */
+    /**
+     * The W3C traceparent of the span active when the event is written (normally the API request's), so the relay
+     * and the consumers can log under the same traceId later. Null means "no trace" (tracing off, as in tests).
+     */
     private static String currentTraceparent() {
-        return null;
+        return EventTracing.currentTraceparent();
     }
 }
