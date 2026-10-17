@@ -20,7 +20,7 @@ The design is in [docs/RFC-001-valuation-loop.md](docs/RFC-001-valuation-loop.md
 | 2 | Every reply can carry an evidence pack built to one standard from real public data, chosen and curated by the agent, machine-readable, with provenance. | `evidence/ComparablesQueryTest.missingFloorAreaGetsHalfWeightInTheSameQuery`, `evidence/ComparablesRankingEsTest.floorAreaMatchRanksAboveMissingFloorArea` and `packFromLiveEsHasProvenanceAndAttachEmitsASchemaValidEvent` (live Elasticsearch) |
 | 3 | The seller's choice, the visit and the instruction join back to the lead even when late and out of order, and one replayable query answers "do evidenced answers win the seller, and at what price gap?". | `scorecard/ScorecardReplayTest.outOfOrderLateAndDuplicateEventsProjectDeterministicallyAndReplayRebuildsIdenticalFacts`, `scorecard/ProductQueryTest.sharesCapturedByTheHighestRangeReplySplitByEvidence` |
 
-All test paths are under `src/test/java/uk/valuationloop/`. There are 146 tests; the two live-Elasticsearch ones run
+All test paths are under `src/test/java/uk/valuationloop/`. There are 147 tests; the two live-Elasticsearch ones run
 only with `make test-es` (`./gradlew test -Pes=true`).
 
 ## The real number
@@ -106,7 +106,7 @@ Gradle comes from the wrapper (`./gradlew`, Gradle 8.14.3).
 ### Steps
 
 ```
-make test            # 146 tests: 144 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
+make test            # 147 tests: 145 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
 make services-up     # Postgres on 5433, Kafka on 9092, Elasticsearch on 9200 (make status to check)
 make test-es         # the same plus the two live-Elasticsearch tests (needs Elasticsearch up)
 make load            # load Wandsworth + Lambeth into Elasticsearch (about 23 s; make demo runs it if the index is missing)
@@ -232,12 +232,27 @@ it. the portal's application asks how candidates use AI; this repository is my a
 - Real CRM behaviour. Three simulated adapters stand in for many real integrations.
 - Security. The webhook uses a shared secret and the agent API trusts the path; see the RFC for what production needs.
 
+## Versions
+
+| Piece | Version |
+|---|---|
+| Java | 21 |
+| Spring Boot / Spring Framework | 4.1.1 / 7.0.9 |
+| spring-kafka / kafka-clients | 4.1.1 / 4.2.1 (broker 4.3.1, KRaft) |
+| Jackson | 3.1.5 (the Elasticsearch client alone uses Jackson 2.21) |
+| Hibernate / Flyway | 7.4.5 / 12.4.0 |
+| Elasticsearch / `elasticsearch-java` | 8.19.4 / 8.18.8 |
+| Postgres | 18 (tests: H2 2.4.240 in PostgreSQL mode) |
+| Gradle | 8.14.3, Kotlin DSL |
+
+Upgraded from Boot 3.5.16 on 2026-10-17; see `docs/adr/0005-boot-4-upgrade-attempt.md`.
+
 ## v2
 
 Done after v1 (2026-10-17): slow-CRM isolation (6 partitions, 3 listener threads, a 5 s adapter timeout), the
 api/worker split from one jar, the Land Registry late match (postcode + type + date; demo-only self-match), the static
-side-by-side page, CI on GitHub Actions. What is left:
+side-by-side page, CI on GitHub Actions, and the upgrade to Spring Boot 4.1.1 with Jackson 3 and spring-kafka 4.1
+(versions in RFC §17, what changed in `docs/adr/0005-boot-4-upgrade-attempt.md`). What is left:
 
-1. Bump to Spring Boot 4.1 (Boot 3.5 left open-source support on 2026-06-30). In progress next.
-2. Testcontainers-based integration tests against real Postgres and Kafka (CI uses H2 and embedded Kafka today).
-3. Optional EBM sidecar for the comparables range with an error estimate.
+1. Testcontainers-based integration tests against real Postgres and Kafka (CI uses H2 and embedded Kafka today).
+2. Optional EBM sidecar for the comparables range with an error estimate.

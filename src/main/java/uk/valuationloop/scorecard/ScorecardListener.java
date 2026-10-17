@@ -1,7 +1,7 @@
 package uk.valuationloop.scorecard;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -47,7 +47,7 @@ public class ScorecardListener {
         EventEnvelope envelope;
         try {
             envelope = objectMapper.readValue(envelopeJson, EventEnvelope.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             // retrying cannot fix a record that is not an envelope; log it and move on rather than block the partition
             log.warn("scorecard skips a record that is not an event envelope: {}", e.getOriginalMessage());
             return;

@@ -4,8 +4,8 @@ import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,7 +13,7 @@ import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -39,7 +39,7 @@ import uk.valuationloop.outbox.Topics;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@EmbeddedKafka(kraft = true, partitions = 6,
+@EmbeddedKafka(partitions = 6,
         topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
 @TestPropertySource(properties = {
         // its own in-memory database: this context's relay and listener keep running while Spring caches the
@@ -82,7 +82,7 @@ public abstract class DeliveryIntegrationTestBase {
                         .content(json.writeValueAsString(body)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.readTree(response).get("requestId").asText();
+        return json.readTree(response).get("requestId").asString();
     }
 
     protected AgentLead leadOf(String requestId, String agentId) {
@@ -103,7 +103,7 @@ public abstract class DeliveryIntegrationTestBase {
                 .filter(r -> r.getEventType().equals(eventType))
                 .map(OutboxEvent::getPayload)
                 .map(this::readTree)
-                .filter(env -> leadId.equals(env.path("leadId").asText(null)))
+                .filter(env -> leadId.equals(env.path("leadId").asString(null)))
                 .toList();
     }
 

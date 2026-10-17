@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -58,7 +58,7 @@ class CompletionScannerTest extends LoopApiTestBase {
         String response = mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(body)))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        return json.readTree(response).get("requestId").asText();
+        return json.readTree(response).get("requestId").asString();
     }
 
     @Test
@@ -93,11 +93,11 @@ class CompletionScannerTest extends LoopApiTestBase {
         assertThat(events.get(0).getTopic()).isEqualTo(Topics.OUTCOME_RECORDED);
         EventSchemas.assertValid(events.get(0).getPayload());
         JsonNode envelope = tree(events.get(0).getPayload());
-        assertThat(envelope.get("leadId").asText()).isEqualTo(instructed);
-        assertThat(envelope.get("agentId").asText()).isEqualTo(AG1);
-        assertThat(envelope.at("/payload/ppdTransactionId").asText()).isEqualTo("ppd-completion");
+        assertThat(envelope.get("leadId").asString()).isEqualTo(instructed);
+        assertThat(envelope.get("agentId").asString()).isEqualTo(AG1);
+        assertThat(envelope.at("/payload/ppdTransactionId").asString()).isEqualTo("ppd-completion");
         assertThat(envelope.at("/payload/completedPrice").asLong()).isEqualTo(612_000);
-        assertThat(envelope.at("/payload/completedAt").asText()).isEqualTo(instructedOn.plusDays(40).toString());
+        assertThat(envelope.at("/payload/completedAt").asString()).isEqualTo(instructedOn.plusDays(40).toString());
 
         // a rescan: the lead is no longer a candidate, nothing new is written
         CompletionScanner.ScanResult second = scanner.scanOnce();

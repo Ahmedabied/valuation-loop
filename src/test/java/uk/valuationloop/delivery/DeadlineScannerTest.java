@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -46,14 +46,14 @@ class DeadlineScannerTest extends DeliveryIntegrationTestBase {
             List<JsonNode> expired = outboxEvents(EventTypes.LEAD_EXPIRED, lead.getId());
             assertThat(expired).hasSize(1);
             EventSchemas.assertValid(expired.get(0).toString());
-            assertThat(expired.get(0).at("/payload/replyDueAt").asText()).isNotBlank();
+            assertThat(expired.get(0).at("/payload/replyDueAt").asString()).isNotBlank();
         }
 
         assertThat(requests.findById(requestId).orElseThrow().getState()).isEqualTo(RequestState.CLOSED);
         List<String> closed = outboxEventsForRequest(EventTypes.REQUEST_CLOSED, requestId);
         assertThat(closed).hasSize(1);
         EventSchemas.assertValid(closed.get(0));
-        assertThat(readTree(closed.get(0)).at("/payload/reason").asText()).isEqualTo("ALL_LEADS_TERMINAL");
+        assertThat(readTree(closed.get(0)).at("/payload/reason").asString()).isEqualTo("ALL_LEADS_TERMINAL");
 
         // a second scan finds nothing new and does not close the request twice
         scanner.scanOnce();

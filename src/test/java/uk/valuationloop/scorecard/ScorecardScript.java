@@ -1,10 +1,10 @@
 package uk.valuationloop.scorecard;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -36,8 +36,7 @@ final class ScorecardScript {
 
     /** ISO-8601 instants, like the app's own mapper; used to write the envelopes and to read them back. */
     static final ObjectMapper JSON = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)   // Jackson 3 has java.time built in
             .build();
 
     /** One record as it goes on the wire: topic, key (the requestId) and the envelope JSON. */
@@ -104,7 +103,7 @@ final class ScorecardScript {
     static EventEnvelope parse(String json) {
         try {
             return JSON.readValue(json, EventEnvelope.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -125,7 +124,7 @@ final class ScorecardScript {
                     requestId, leadId, agentId, null, payload));
             EventSchemas.assertValid(json);
             return json;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException(e);
         }
     }

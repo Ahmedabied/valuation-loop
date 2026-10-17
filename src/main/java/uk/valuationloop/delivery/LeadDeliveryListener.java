@@ -1,7 +1,7 @@
 package uk.valuationloop.delivery;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +12,7 @@ import org.springframework.kafka.retrytopic.DltStrategy;
 import org.springframework.kafka.retrytopic.TopicSuffixingStrategy;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
-import org.springframework.retry.annotation.Backoff;
+import org.springframework.kafka.annotation.BackOff;
 import org.springframework.stereotype.Component;
 import uk.valuationloop.delivery.DeliverLead.MalformedCommand;
 import uk.valuationloop.observability.EventTracing;
@@ -61,7 +61,7 @@ public class LeadDeliveryListener {
 
     @RetryableTopic(
             attempts = "3",                                          // 1 try on the main topic + 2 retry topics
-            backoff = @Backoff(delay = 500, multiplier = 2.0),       // 500 ms, then 1000 ms
+            backOff = @BackOff(delay = 500, multiplier = 2.0),       // 500 ms, then 1000 ms
             topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE, // -retry-0, -retry-1 (not -retry-500)
             retryTopicSuffix = "-retry",
             dltTopicSuffix = "-dlt",
@@ -107,7 +107,7 @@ public class LeadDeliveryListener {
     private EventEnvelope parse(String envelopeJson) {
         try {
             return objectMapper.readValue(envelopeJson, EventEnvelope.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new MalformedCommand("lead.deliver.v1 record is not a JSON envelope", e);
         }
     }
