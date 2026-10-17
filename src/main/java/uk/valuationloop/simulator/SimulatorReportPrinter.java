@@ -50,9 +50,11 @@ public final class SimulatorReportPrinter {
         AgentScorecard s = r.selectedAgentScorecard();
         if (s != null) {
             out.append(String.format("scorecard of %s (own numbers, all runs so far): leads %d, replied %d, median reply %s min, "
-                            + "evidence share %s, engaged %d, selected %d, visits %d, instructed %d%n",
+                            + "evidence share %s, engaged %d, selected %d, visits %d, instructed %d, completed %d, "
+                            + "median price gap %s%%%n",
                     s.agentId(), s.leads(), s.replied(), s.medianReplyMinutes(), s.evidenceAttachedShare(),
-                    s.sellerEngaged(), s.sellerSelected(), s.visitsBooked(), s.instructed()));
+                    s.sellerEngaged(), s.sellerSelected(), s.visitsBooked(), s.instructed(), s.completed(),
+                    s.medianPriceGapPct() == null ? "-" : s.medianPriceGapPct()));
         }
         return out.toString();
     }

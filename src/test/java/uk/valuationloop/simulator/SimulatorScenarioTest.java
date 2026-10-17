@@ -2,6 +2,7 @@ package uk.valuationloop.simulator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import uk.valuationloop.completion.CompletedSales;
+import uk.valuationloop.evidence.ComparableDocument;
 import uk.valuationloop.evidence.FakeEvidenceSources;
 import uk.valuationloop.evidence.GeoPoint;
 import uk.valuationloop.evidence.PostcodeCentroids;
@@ -49,6 +52,16 @@ class SimulatorScenarioTest {
             return search;
         }
 
+        /**
+         * Land Registry, faked: one later sale at whatever postcode is asked, 45 days after the earliest date the rule
+         * allows (so 15 days after the instruction), so the late match finds it.
+         */
+        @Bean @Primary CompletedSales fakeCompletedSales() {
+            return (postcode, type, onOrAfter) -> List.of(new ComparableDocument("ppd-sim-completion", 612_000,
+                    onOrAfter.plusDays(45).toString(), postcode, postcode.split(" ")[0], FakeEvidenceSources.ORIGIN,
+                    type, null, false, "L", null, null, null, null, "WANDSWORTH", "ppd-test"));
+        }
+
         /** Every postcode resolves (the real centroid index is in Elasticsearch). */
         @Bean @Primary PostcodeCentroids anyPostcode() {
             return postcode -> Optional.of(new GeoPoint(FakeEvidenceSources.ORIGIN.lat(), FakeEvidenceSources.ORIGIN.lon()));
@@ -82,6 +95,16 @@ class SimulatorScenarioTest {
                 .containsEntry("visitBooked", true).containsEntry("evidenceAttached", true);
         assertThat(report.selectedAgentScorecard().instructed()).isEqualTo(1);
 
-        assertThat(SimulatorReportPrinter.print(report)).contains("== ok").contains(report.requestId());
+        // the v2 late match: the sale joined to the selected lead, with the gap to its replied range's midpoint
+        assertThat(fact).containsEntry("completed", true);
+        assertThat(fact.get("priceGapPct")).isNotNull();
+        assertThat(report.checks().get("Land Registry late match").toString())
+                .startsWith("completed=true, priceGapPct=" + fact.get("priceGapPct"))
+                .contains("ppd-sim-completion").contains("demo: self-match possible");
+        assertThat(report.selectedAgentScorecard().completed()).isEqualTo(1);
+        assertThat(report.selectedAgentScorecard().medianPriceGapPct()).isNotNull();
+
+        assertThat(SimulatorReportPrinter.print(report)).contains("== ok").contains(report.requestId())
+                .contains("completed=true").contains("completed 1, median price gap");
     }
 }
