@@ -1,7 +1,7 @@
 # Profile "worker": the jar as the delivery process of a split run (make run-worker / run-split / demo-split).
 # Runs the DeliverLead listener with its retry topics and DLT handler (6 partitions, 3 threads), the deadline
 # scanner and the outbox relay (the only relay in a split run: it sends the rows both processes write to the shared
-# Postgres). The scorecard consumer runs in the api, not here. The HTTP routes exist here too but nothing calls them,
+# Postgres). The scorecard consumer and the late-match scan run in the api, not here. The HTTP routes exist here too but nothing calls them,
 # except the demo-only /internal/demo/delivery/* the api's simulator uses. dlt_records_total is on this process's 8091.
 server:
   port: 8090
@@ -19,3 +19,5 @@ valuationloop:
   scorecard:
     listener:
       auto-startup: false          # the scorecard (group "scorecard") is consumed by the api
+  completion:
+    enabled: false                 # the late-match scan runs in the api only, so two processes never race one lead
