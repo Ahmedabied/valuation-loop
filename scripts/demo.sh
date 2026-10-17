@@ -59,7 +59,7 @@ echo; echo "######## GET /scorecard/product-query (internal: do evidenced replie
 curl -sf "$API/scorecard/product-query" | python3 -m json.tool
 
 echo; echo "######## Prometheus (127.0.0.1:8081/actuator/prometheus)"
-curl -sf "$ACTUATOR/actuator/prometheus" | grep -E '^(outbox_unsent|dlt_records_total|reply_minutes_(count|sum|max)) '
+curl -sf "$ACTUATOR/actuator/prometheus" | grep -E '^(outbox_unsent|dlt_records_total|reply_minutes_(count|sum|max)|scorecard_skipped_total) '
 
 trace=$(grep -m1 -oE 'traceId [0-9a-f]{32}' "$LOGS/demo-report.txt" | cut -d' ' -f2 || true)
 if [ -n "$trace" ]; then

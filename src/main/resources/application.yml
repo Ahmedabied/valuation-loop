@@ -54,6 +54,8 @@ valuationloop:
   scorecard:
     listener:
       auto-startup: true           # the scorecard consumer; make replay starts it by hand after truncating
+    retry-ms: 1000                 # a failed scorecard event is retried in place this far apart (partition paused)
+    retry-attempts: 10             # retries after the first try; then it is logged, counted and skipped (no DLT)
   completion:                      # v2 Land Registry late match (completion/CompletionScanner.java)
     enabled: true                  # off in tests, which call CompletionScanner.scanOnce() by hand
     scan-ms: 60000                 # how often instructed leads are checked for their sale in Price Paid Data

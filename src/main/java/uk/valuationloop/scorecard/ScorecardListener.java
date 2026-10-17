@@ -17,6 +17,10 @@ import uk.valuationloop.outbox.Topics;
  * commits through Spring's proxy, and returns; only then does the container commit the offset. A crash between the
  * two means the record comes again, and the upsert by lead_id makes the second copy a no-op.
  *
+ * Errors (ScorecardKafkaConfig): a projector failure is retried in place, 10 times 1 s apart by default, with the
+ * partition paused so order is kept; if it still fails, the record is logged at ERROR, counted in
+ * scorecard_skipped_total and skipped. No dead letter topic: the read model is rebuildable with `make replay`.
+ *
  * auto.offset.reset=earliest: a brand-new scorecard group starts from the beginning of the topics, because the read
  * model is the whole history, not just what happens after it was deployed.
  */
@@ -41,6 +45,7 @@ public class ScorecardListener {
             id = LISTENER_ID,
             topics = {Topics.LEAD_EVENTS, Topics.OUTCOME_RECORDED},
             groupId = GROUP_ID,
+            containerFactory = ScorecardKafkaConfig.CONTAINER_FACTORY,
             properties = "auto.offset.reset=earliest",
             autoStartup = "${valuationloop.scorecard.listener.auto-startup:true}")
     public void onEvent(String envelopeJson) {

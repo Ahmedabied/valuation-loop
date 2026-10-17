@@ -24,7 +24,9 @@ it started. The services stay up; `make services-down` stops them. It can be run
    these numbers show the query works end to end, not that evidence wins sellers.
 6. **Metrics** from `127.0.0.1:8081/actuator/prometheus`:
    `outbox_unsent` (rows committed, not yet on Kafka; should return to 0), `dlt_records_total` (dead-lettered
-   deliveries since start), `reply_minutes_count/_sum/_max` (delivery -> reply; near 0 in a simulation).
+   deliveries since start), `reply_minutes_count/_sum/_max` (delivery -> reply; near 0 in a simulation),
+   `scorecard_skipped_total` (scorecard events skipped after 10 in-place retries failed; should be 0, anything else
+   means `scorecard_fact` misses those events until `make replay`).
 7. **One trace**: the first log line per logger carrying the `ok` scenario's traceId: the API thread, the outbox
    relay, the delivery consumer and the scorecard consumer share it, because the envelope carries `traceparent`.
    `grep <traceId> ~/tools/logs/app.log` shows the whole story.
