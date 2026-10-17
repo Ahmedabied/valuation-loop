@@ -29,7 +29,7 @@ dependencies {
     // Pinned on purpose: Boot 4.1 manages the 9.x client, which is not supported against an 8.19 server (the Java
     // client is forward compatible only; docs/adr/0005). The 8.x client needs Jackson 2 for its JacksonJsonpMapper.
     implementation("co.elastic.clients:elasticsearch-java:8.18.8")
-    implementation("org.elasticsearch.client:elasticsearch-rest-client:8.18.8") // Boot 4 no longer manages it; same version as the client
+    implementation("org.elasticsearch.client:elasticsearch-rest-client:9.5.5") // Boot 4 no longer manages it; same version as the client
     implementation("com.fasterxml.jackson.core:jackson-databind") // Jackson 2 (Boot's jackson-2-bom), only for the ES client's JacksonJsonpMapper
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry") // tracing auto-config + the OTel bridge, no exporter
