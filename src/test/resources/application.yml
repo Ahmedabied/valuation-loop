@@ -43,5 +43,7 @@ valuationloop:
   scorecard:
     listener:
       auto-startup: false
+  completion:
+    enabled: false                 # the late-match scanner; tests call CompletionScanner.scanOnce() by hand
   outcome:
     webhook-token: test-webhook-token

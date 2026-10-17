@@ -57,5 +57,12 @@ public final class EventTypes {
     /** Topic {@value Topics#OUTCOME_RECORDED}, key requestId. Payload: leadRef (the leadId the CRM echoes back), source, recordedAt. */
     public static final String INSTRUCTION_RECORDED = "InstructionRecorded";
 
+    /**
+     * Topic {@value Topics#OUTCOME_RECORDED}, key requestId. Payload: ppdTransactionId, completedPrice, completedAt
+     * (date), matchRule. The v2 Land Registry late match (completion module); a private outcome fact, never on the
+     * seller page.
+     */
+    public static final String COMPLETION_MATCHED = "CompletionMatched";
+
     private EventTypes() {}
 }

@@ -50,6 +50,10 @@ valuationloop:
   scorecard:
     listener:
       auto-startup: true           # the scorecard consumer; make replay starts it by hand after truncating
+  completion:                      # v2 Land Registry late match (completion/CompletionScanner.java)
+    enabled: true                  # off in tests, which call CompletionScanner.scanOnce() by hand
+    scan-ms: 60000                 # how often instructed leads are checked for their sale in Price Paid Data
+    lookback-days: 30              # a sale counts if transferred on or after (instruction date - this many days)
   outcome:
     # Shared secret the CRM sends in X-Webhook-Token on POST /outcomes/webhook. Demo only: production uses a
     # per-CRM HMAC signature over the body, which also binds the leadRef to the agent whose CRM signed it.
