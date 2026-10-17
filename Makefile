@@ -115,3 +115,22 @@ demo: services-up jar
 # rebuild scorecard_fact from the topics (ScorecardReplay): snapshot, truncate, reset offsets, replay, compare, exit
 replay: services-up jar
 	@LOGS=$(LOGS) APP_JAR=$(APP_JAR) PG_PWFILE=$(PG_PWFILE) scripts/replay.sh
+
+# ---------- split run: the same jar as two processes (docs/DEMO.md "Split run", scripts/split.sh) ----------
+# api: 8080/8081, everything but delivery. worker: 8090/8091, DeliverLead listener + DLT, deadline scanner, outbox relay.
+# Background processes with pidfiles $(LOGS)/api.pid and $(LOGS)/worker.pid; scripts/split.sh stop stops them.
+.PHONY: run-api run-worker run-split demo-split
+SPLIT_ENV = LOGS=$(LOGS) APP_JAR=$(APP_JAR) PG_PWFILE=$(PG_PWFILE)
+
+run-api: jar
+	@$(SPLIT_ENV) scripts/split.sh api
+
+run-worker: jar
+	@$(SPLIT_ENV) scripts/split.sh worker
+
+run-split: jar
+	@$(SPLIT_ENV) scripts/split.sh both
+
+# services up, both processes up, every scenario against the api, report + worker metrics, both stopped again
+demo-split: services-up jar
+	@$(SPLIT_ENV) scripts/split.sh demo
