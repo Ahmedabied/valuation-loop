@@ -8,13 +8,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.stereotype.Component;
 
 /**
- * The three Prometheus metrics of ARCHITECTURE.md §11, registered in one place so their names live in one file.
+ * The three Prometheus metrics of ARCHITECTURE.md §11, plus the scorecard's skip counter, registered in one place so
+ * their names live in one file.
  * Micrometer names use dots; the Prometheus endpoint turns them into the names below (a counter gets "_total").
  *
  * <pre>
  *   outbox_unsent        gauge    rows committed but not yet on Kafka; sampled by OutboxRelay every tick
  *   dlt_records_total    counter  DeliverLead records that reached lead.deliver.v1-dlt (LeadDeliveryListener)
  *   reply_minutes        summary  minutes from delivery to the agent's reply (_count, _sum, _max), ReplyService
+ *   scorecard_skipped_total  counter  scorecard events skipped after every in-place retry failed (ScorecardKafkaConfig);
+ *                                     anything above 0 means scorecard_fact is missing events until `make replay`
  * </pre>
  * Labels are deliberately absent: no agentId label, so no metric compares one agent with another.
  *
@@ -28,10 +31,12 @@ public class LoopMetrics {
     public static final String OUTBOX_UNSENT = "outbox.unsent";
     public static final String DLT_RECORDS = "dlt.records";
     public static final String REPLY_MINUTES = "reply.minutes";
+    public static final String SCORECARD_SKIPPED = "scorecard.skipped";
 
     private final AtomicLong outboxUnsent = new AtomicLong();   // the gauge reads this value when scraped
     private final Counter dltRecords;
     private final DistributionSummary replyMinutes;
+    private final Counter scorecardSkipped;
 
     public LoopMetrics(MeterRegistry registry) {
         Gauge.builder(OUTBOX_UNSENT, outboxUnsent, AtomicLong::get)
@@ -43,6 +48,9 @@ public class LoopMetrics {
         this.replyMinutes = DistributionSummary.builder(REPLY_MINUTES)
                 .baseUnit("minutes")
                 .description("Minutes from lead delivery to the agent's reply")
+                .register(registry);
+        this.scorecardSkipped = Counter.builder(SCORECARD_SKIPPED)
+                .description("Scorecard events skipped after every retry failed; make replay restores them")
                 .register(registry);
     }
 
@@ -56,6 +64,14 @@ public class LoopMetrics {
 
     public void replyMinutes(double minutes) {
         replyMinutes.record(minutes);
+    }
+
+    public void scorecardSkipped() {
+        scorecardSkipped.increment();
+    }
+
+    public double scorecardSkippedSoFar() {
+        return scorecardSkipped.count();
     }
 
     /** Read back by the simulator's flaky-crm report. */

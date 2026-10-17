@@ -117,7 +117,7 @@ final class ScorecardScript {
     }
 
     /** An envelope as the outbox would write it, at a fixed time; returned as the JSON that goes on the wire. */
-    private static String envelope(String type, String requestId, String leadId, String agentId, Duration at,
+    static String envelope(String type, String requestId, String leadId, String agentId, Duration at,
                                    Map<String, Object> payload) {
         try {
             String json = JSON.writeValueAsString(new EventEnvelope(UuidV7.next(), type, 1, T0.plus(at),

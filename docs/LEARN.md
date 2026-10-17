@@ -331,10 +331,15 @@ push on that 1 to 23 did not cover.
     production the request comes before the sale, the key is the UPRN, not postcode + type, and the gap only means
     something as a median over many leads, split as the product query does.
 26. **The scorecard projector throws on a valid event (Postgres down). What happens?** (added by review 2) The
-    scorecard listener has no error handler of its own, so spring-kafka's default applies: 10 attempts with no back
-    off, then it logs an error and commits the offset. The event stays on the topic, but the fact misses it until the
-    next `make replay`. That is the honest weak spot of the read model; the fix is a blocking back-off (or a
-    scorecard DLT) for that container, so a database outage pauses the consumer instead of skipping events.
+    scorecard listener has its own container factory (`scorecard/ScorecardKafkaConfig`) with a
+    `DefaultErrorHandler(FixedBackOff(1000 ms, 10))`: the container seeks back to the failed record and tries it
+    again, 10 more times 1 s apart, with the partition paused, so the events behind it wait and order is kept. A
+    database blip shorter than about 10 s heals in place and the fact is written once. If it is still failing after
+    that, the record is logged at ERROR with its eventId, eventType and leadId, counted in `scorecard_skipped_total`,
+    and skipped (the offset is committed). There is no DLT: the read model is rebuildable with `make replay`, and the
+    skipped event is still on its topic, so a replay after the outage restores the missing fact. Delivery is
+    different (non-blocking retry topics) because there one flaky CRM must not hold up other agents' leads; here the
+    failing thing is our own database, which every record needs. Test: `ScorecardListenerRetryTest`.
 27. **How do you change an event without breaking replay?** (added by review 2) Additive changes only, in place: a
     new optional field, which old consumers ignore. A breaking change gets a new `schemaVersion` (or a `.v2` topic)
     and the projector handles both versions, because replay reads the whole history from offset 0 and old events

@@ -77,7 +77,7 @@ demo() {
   echo; echo "######## worker metrics (127.0.0.1:8091/actuator/prometheus)"
   curl -sf "127.0.0.1:8091/actuator/prometheus" | grep -E '^(outbox_unsent|dlt_records_total) '
   echo "######## api metrics (127.0.0.1:8081/actuator/prometheus)"
-  curl -sf "127.0.0.1:8081/actuator/prometheus" | grep -E '^(reply_minutes_(count|sum|max)) '
+  curl -sf "127.0.0.1:8081/actuator/prometheus" | grep -E '^(reply_minutes_(count|sum|max)|scorecard_skipped_total) '
   echo; echo "make demo-split: done (report in $LOGS/demo-split-report.txt, logs $LOGS/api.log and $LOGS/worker.log)"
 }
 

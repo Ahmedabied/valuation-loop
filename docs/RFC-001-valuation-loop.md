@@ -322,7 +322,10 @@ retention period. The real product would set one by its own policy; this is a kn
 - **Metrics** (`observability/LoopMetrics`, on `127.0.0.1:8081/actuator/prometheus`, no agent label on any of them):
   `outbox_unsent` (gauge: rows committed but not yet on Kafka, sampled every relay tick), `dlt_records_total`
   (counter: DeliverLead records that reached `lead.deliver.v1-dlt`), `reply_minutes` (summary: delivery to reply,
-  exported as `reply_minutes_count`, `_sum`, `_max`).
+  exported as `reply_minutes_count`, `_sum`, `_max`), `scorecard_skipped_total` (counter: scorecard events skipped
+  after their in-place retries failed; `scorecard/ScorecardKafkaConfig` retries a failing event 10 times 1 s apart
+  with the partition paused, then logs it at ERROR with its eventId, eventType and leadId and moves on; no DLT,
+  because the read model is rebuildable with `make replay` and the event is still on its topic).
 - Actuator also serves `health`, `info` and `metrics` on that loopback port. Jaeger (a trace UI) is v2.
 
 ## 17. Versions
