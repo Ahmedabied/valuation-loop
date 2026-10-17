@@ -51,7 +51,9 @@ public class ValuationRequestService {
         Instant now = clock.instant();
         ValuationRequest request = ValuationRequest.receive(cmd.sellerRef(), cmd.postcode(), cmd.propertyType(),
                 cmd.bedrooms(), cmd.floorAreaM2(), now);
-        requests.save(request);
+        // save() returns the managed copy: with an assigned id Spring Data merges rather than persists, so keep
+        // the returned instance, or the state changes below land on a detached object and never reach the row
+        request = requests.save(request);
         outbox.write(Topics.VALUATION_REQUESTED, request.getId(), EventEnvelope.of("ValuationRequested",
                 request.getId(), null, null, Map.of(
                         "postcode", request.getPostcode(),
