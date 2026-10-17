@@ -2,6 +2,8 @@ package uk.valuationloop.outcome;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,9 +30,16 @@ class OutcomeApiTest extends LoopApiTestBase {
         return mvc.perform(body == null ? req : req.contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
+    static final String TOKEN = "test-webhook-token";   // valuationloop.outcome.webhook-token in src/test/resources/application.yml
+
     ResultActions webhook(String leadRef) throws Exception {
-        return mvc.perform(post("/outcomes/webhook").contentType(MediaType.APPLICATION_JSON).content(
-                "{\"leadRef\": \"" + leadRef + "\", \"source\": \"fake-crm\", \"recordedAt\": \"2026-10-20T10:15:00Z\"}"));
+        return webhook(leadRef, TOKEN);
+    }
+
+    ResultActions webhook(String leadRef, String token) throws Exception {
+        var req = post("/outcomes/webhook").contentType(MediaType.APPLICATION_JSON).content(
+                "{\"leadRef\": \"" + leadRef + "\", \"source\": \"fake-crm\", \"recordedAt\": \"2026-10-20T10:15:00Z\"}");
+        return mvc.perform(token == null ? req : req.header("X-Webhook-Token", token));
     }
 
     @Test
@@ -80,7 +89,8 @@ class OutcomeApiTest extends LoopApiTestBase {
 
         webhook(lead).andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("RECORDED"));
         webhook(lead).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ALREADY_RECORDED"));
-        webhook("ld_unknown_lead_ref").andExpect(status().isNotFound());
+        webhook("ld_unknown_lead_ref").andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("not_found"));
 
         List<OutboxEvent> recorded = outboxRows(EventTypes.INSTRUCTION_RECORDED, requestId);
         assertThat(recorded).hasSize(1);   // the repeat wrote nothing
@@ -93,6 +103,27 @@ class OutcomeApiTest extends LoopApiTestBase {
         assertThat(envelope.at("/payload/source").asText()).isEqualTo("fake-crm");
         assertThat(envelope.at("/payload/recordedAt").asText()).isEqualTo("2026-10-20T10:15:00Z");
         assertThat(leads.findById(lead).orElseThrow().getInstructedAt()).isNotNull();
+    }
+
+    @Test
+    void webhookWithoutTheRightTokenIs401AndRecordsNothing() throws Exception {
+        String requestId = postRequest("seller-outcome-5", List.of(AGENT));
+        String lead = leadIdOf(requestId, AGENT);
+        markDelivered(lead);
+
+        webhook(lead, null)
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(jsonPath("$.error").value("unauthorized"))
+                .andExpect(jsonPath("$.message").value("missing or wrong X-Webhook-Token"));
+        webhook(lead, "not-the-token").andExpect(status().isUnauthorized());
+        // checked before the body: an invalid body without a token is still 401, not 422
+        mvc.perform(post("/outcomes/webhook").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(outboxRows(EventTypes.INSTRUCTION_RECORDED, requestId)).isEmpty();
+        assertThat(leads.findById(lead).orElseThrow().getInstructedAt()).isNull();
     }
 
     @Test

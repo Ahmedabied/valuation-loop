@@ -3,6 +3,8 @@ package uk.valuationloop.request;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -34,7 +36,8 @@ import uk.valuationloop.outbox.Topics;
 import uk.valuationloop.support.EventSchemas;
 
 /** POST a request -> one lead per slot holder -> one DeliverLead command per lead on the wire, keyed by leadId. */
-@SpringBootTest
+@SpringBootTest(properties = // its own in-memory database, never shared with another test context
+        "spring.datasource.url=jdbc:h2:mem:request_flow_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc
 @EmbeddedKafka(kraft = true, partitions = 3, topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER})
 class ValuationRequestFlowTest {
@@ -130,8 +133,24 @@ class ValuationRequestFlowTest {
     @Test
     void badPostcodeIs422() throws Exception {
         String body = json.writeValueAsString(Map.of(
-                "sellerRef", "s", "postcode", "not a postcode", "propertyType", "FLAT", "bedrooms", 1));
+                "sellerRef", "s", "postcode", "<b>not a postcode</b>", "propertyType", "FLAT", "bedrooms", 1));
         mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(jsonPath("$.error").value("invalid"))
+                .andExpect(jsonPath("$.message").value("not a UK postcode"));   // the input is never echoed back
+    }
+
+    @Test
+    void invalidBodyIs422WithTheFieldNamesAndUnknownRequestIs404() throws Exception {
+        mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON).content("{\"bedrooms\": 2}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("invalid"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("postcode")));
+        mvc.perform(get("/valuation-requests/vr_does_not_exist"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("not_found"))
+                .andExpect(jsonPath("$.message").value("no request vr_does_not_exist"));
     }
 }

@@ -9,18 +9,20 @@ import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 import uk.valuationloop.lead.AgentLead;
 import uk.valuationloop.lead.AgentLeadRepository;
 
-/** The seller-facing entry point. Django: a view + serializer; here the records are the serializers. */
+/**
+ * The seller-facing entry point. Django: a view + serializer; here the records are the serializers.
+ * 422 for a bad postcode, an unknown selected agent or no slot holder; error bodies come from
+ * {@link uk.valuationloop.api.ApiErrors}.
+ */
 @RestController
 @RequestMapping("/valuation-requests")
 public class ValuationRequestController {
@@ -61,7 +63,7 @@ public class ValuationRequestController {
     @GetMapping("/{id}")
     public RequestView get(@PathVariable String id) {
         ValuationRequest r = requests.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no request " + id));
+                .orElseThrow(() -> new RequestNotFound(id));
         return view(r, leads.findByRequestIdOrderByCreatedAt(id));
     }
 
@@ -70,8 +72,8 @@ public class ValuationRequestController {
                 r.getPropertyType().name(), r.getBedrooms(), ls.stream().map(LeadSummary::of).toList());
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, ValuationRequestService.NoEligibleAgents.class})
-    public ResponseEntity<String> badRequest(RuntimeException e) {
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(e.getMessage());
+    /** 404 (mapped in {@link uk.valuationloop.api.ApiErrors}). */
+    public static class RequestNotFound extends RuntimeException {
+        public RequestNotFound(String requestId) { super("no request " + requestId); }
     }
 }

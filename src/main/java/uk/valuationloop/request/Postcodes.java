@@ -16,11 +16,11 @@ public final class Postcodes {
         }
         String compact = raw.trim().toUpperCase().replaceAll("\\s+", "");
         if (compact.length() < 5 || compact.length() > 7) {
-            throw new IllegalArgumentException("not a UK postcode: " + raw);
+            throw new IllegalArgumentException("not a UK postcode");
         }
         String candidate = compact.substring(0, compact.length() - 3) + " " + compact.substring(compact.length() - 3);
         if (!FULL.matcher(candidate).matches()) {
-            throw new IllegalArgumentException("not a UK postcode: " + raw);
+            throw new IllegalArgumentException("not a UK postcode");
         }
         return candidate;
     }
