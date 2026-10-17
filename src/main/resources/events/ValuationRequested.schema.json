@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ValuationRequested",
+  "description": "A seller asked for valuations. Topic valuation.requested.v1, key requestId. Full envelope, schemaVersion 1 (see docs/EVENTS.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "occurredAt",
+    "requestId",
+    "leadId",
+    "agentId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "uuidv7; the idempotency key"
+    },
+    "eventType": {
+      "const": "ValuationRequested"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^vr_"
+    },
+    "leadId": {
+      "type": "null"
+    },
+    "agentId": {
+      "type": "null"
+    },
+    "traceparent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "W3C trace context; null when no span is active"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "postcode": {
+          "type": "string",
+          "pattern": "^[A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2}$"
+        },
+        "outcode": {
+          "type": "string",
+          "pattern": "^[A-Z]{1,2}[0-9][A-Z0-9]?$"
+        },
+        "propertyType": {
+          "enum": [
+            "FLAT",
+            "HOUSE",
+            "MAISONETTE",
+            "BUNGALOW"
+          ]
+        },
+        "bedrooms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "postcode",
+        "outcode",
+        "propertyType",
+        "bedrooms"
+      ]
+    }
+  }
+}

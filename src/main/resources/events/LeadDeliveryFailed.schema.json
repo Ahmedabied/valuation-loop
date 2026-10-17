@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LeadDeliveryFailed",
+  "description": "Delivery gave up after its attempts (the record is in the DLT). Agent-private; never on the seller page. Topic lead.events.v1, key requestId. Full envelope, schemaVersion 1 (see docs/EVENTS.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "occurredAt",
+    "requestId",
+    "leadId",
+    "agentId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "uuidv7; the idempotency key"
+    },
+    "eventType": {
+      "const": "LeadDeliveryFailed"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^vr_"
+    },
+    "leadId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^ld_"
+    },
+    "agentId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^ag_"
+    },
+    "traceparent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "W3C trace context; null when no span is active"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "adapter",
+        "attempts",
+        "reason"
+      ]
+    }
+  }
+}
