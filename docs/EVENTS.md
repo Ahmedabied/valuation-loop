@@ -31,8 +31,9 @@ attempt 3 on `lead.deliver.v1-retry-1`; a lead that fails all three lands on `le
 
 ## Ordering rule
 Everything about one request is keyed by `requestId`, so it lands on one partition and a consumer sees it in order.
-The one exception is the `DeliverLead` command, keyed by `leadId`: deliveries for different agents spread across
-partitions, so one flaky agent's retries never block another agent's lead.
+The one exception is the `DeliverLead` command, keyed by `leadId`: with several partitions and listener threads,
+deliveries for different agents spread out. v1 runs one partition and one listener thread, so a slow CRM call delays the
+leads queued behind it (the demo's `slow` scenario shows it); a failed call does not, because it waits on a retry topic.
 
 ## Idempotency rule
 Delivery is at-least-once (the outbox relay may resend after a crash), so every consumer must tolerate a repeat.
