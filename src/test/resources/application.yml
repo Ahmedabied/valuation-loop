@@ -1,6 +1,8 @@
 # Test profile: no Postgres, no external Kafka. H2 runs the same Flyway migrations in PostgreSQL mode;
 # @EmbeddedKafka(kraft = true) provides the broker and sets spring.embedded.kafka.brokers.
 spring:
+  profiles:
+    active: test                   # turns on the test/demo-only beans (ScorecardInternalController)
   datasource:
     url: jdbc:h2:mem:valuationloop;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
     username: sa
@@ -10,10 +12,36 @@ spring:
     hibernate:
       ddl-auto: validate
   kafka:
+    # This file replaces src/main/resources/application.yml entirely, so the Kafka semantics are repeated here:
+    # tests run with the same acks, idempotence, offset reset and commit mode as production.
     bootstrap-servers: ${spring.embedded.kafka.brokers:127.0.0.1:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
     consumer:
       group-id: test
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: record
 
 valuationloop:
   outbox:
     enabled: false                 # tests drive the relay by hand so they can observe the gap between commit and send
+  # Background consumers and the scanner are OFF by default; a test class that needs one turns it on in its own
+  # @TestPropertySource (DeliveryIntegrationTestBase, LoopApiTestBase), so no context polls another's database.
+  delivery:
+    listener:
+      auto-startup: false
+    deadline-scanner:
+      enabled: false
+  scorecard:
+    listener:
+      auto-startup: false
+  outcome:
+    webhook-token: test-webhook-token

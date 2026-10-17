@@ -23,6 +23,7 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
+    developmentOnly("com.h2database:h2") // bootRun only (never in the jar): the "loader" profile runs with an in-memory H2, ES the only real service
     implementation("co.elastic.clients:elasticsearch-java:8.18.8")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("io.micrometer:micrometer-tracing-bridge-otel")
@@ -36,9 +37,7 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // ./gradlew test -Pes=true runs the live-Elasticsearch tests (@EnabledIfSystemProperty(named = "es")); off by default
+    systemProperty("es", (findProperty("es") ?: "false").toString())
     testLogging { events("passed", "skipped", "failed") }
-}
-
-dependencies {
-    developmentOnly("com.h2database:h2") // bootRun only (never in the jar): the "loader" profile runs with an in-memory H2, ES the only real service
 }
