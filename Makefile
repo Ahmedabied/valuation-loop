@@ -25,7 +25,7 @@ build:
 
 run:
 	@free -m | awk 'NR==2 && $$7 < 2500 {print "WARNING: only "$$7" MB RAM available; close something first"}'
-	SPRING_PROFILES_ACTIVE=local ./gradlew bootRun -q
+	PG_PASSWORD=$$(cat $(PG_PWFILE)) SPRING_PROFILES_ACTIVE=local ./gradlew bootRun -q
 
 clean-daemons:
 	./gradlew --stop
@@ -65,18 +65,16 @@ PG_PWFILE ?= $(HOME)/tools/pg.pw
 pg-up:
 	@mkdir -p $(LOGS)
 	@if [ ! -f $(PG_PWFILE) ]; then (umask 077; head -c 24 /dev/urandom | base64 | tr -d '/+=' > $(PG_PWFILE)); fi
-	@if [ ! -f $(PG_DATA)/PG_VERSION ]; then $(PG_HOME)/bin/initdb -D $(PG_DATA) -U postgres --auth-local=peer --auth-host=scram-sha-256 --pwfile=$(PG_PWFILE) -E UTF8 >/dev/null && echo "initdb done"; fi
+	@if [ ! -f $(PG_DATA)/PG_VERSION ]; then \
+	  $(PG_HOME)/bin/initdb -D $(PG_DATA) -U postgres --auth-local=peer --auth-host=scram-sha-256 --pwfile=$(PG_PWFILE) -E UTF8 >/dev/null && echo "initdb done"; \
+	  echo "CREATE DATABASE $(PG_DB);" | $(PG_HOME)/bin/postgres --single -D $(PG_DATA) postgres >/dev/null 2>&1 && echo "database $(PG_DB) created"; \
+	fi
 	@$(PG_HOME)/bin/pg_ctl -D $(PG_DATA) status >/dev/null 2>&1 && echo "postgres already running" || \
 	  $(PG_HOME)/bin/pg_ctl -D $(PG_DATA) -o "-p $(PG_PORT) -k $(PG_DATA) -c listen_addresses=127.0.0.1 -c unix_socket_permissions=0700" -l $(LOGS)/pg.log start >/dev/null
-	@PGPASSWORD=$$(cat $(PG_PWFILE)) $(PG_HOME)/bin/psql -h 127.0.0.1 -p $(PG_PORT) -U postgres -tc "select 1 from pg_database where datname='$(PG_DB)'" | grep -q 1 || \
-	  PGPASSWORD=$$(cat $(PG_PWFILE)) $(PG_HOME)/bin/psql -h 127.0.0.1 -p $(PG_PORT) -U postgres -c "create database $(PG_DB)" >/dev/null
-	@echo "postgres up on 127.0.0.1:$(PG_PORT), db $(PG_DB) (password in $(PG_PWFILE))"
+	@echo "postgres up on 127.0.0.1:$(PG_PORT), db $(PG_DB) (password in $(PG_PWFILE); the zonky binaries ship no psql, use the app or a JDBC client)"
 
 pg-down:
 	-$(PG_HOME)/bin/pg_ctl -D $(PG_DATA) stop -m fast >/dev/null && echo "postgres stopped"
-
-psql:
-	PGPASSWORD=$$(cat $(PG_PWFILE)) $(PG_HOME)/bin/psql -h 127.0.0.1 -p $(PG_PORT) -U postgres $(PG_DB)
 
 services-up: pg-up kafka-up es-up
 services-down: es-down kafka-down pg-down
@@ -89,7 +87,7 @@ status:
 
 # ---------- data and demo (filled in as the modules land) ----------
 load:
-	SPRING_PROFILES_ACTIVE=local ./gradlew bootRun -q --args="--loader.run=true"
+	PG_PASSWORD=$$(cat $(PG_PWFILE)) SPRING_PROFILES_ACTIVE=local ./gradlew bootRun -q --args="--loader.run=true"
 
 demo:
 	@echo "make demo: implemented on build day 2 (scenario runner + comparison + scorecard)"
