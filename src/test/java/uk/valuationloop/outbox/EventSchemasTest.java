@@ -45,10 +45,10 @@ class EventSchemasTest {
                 Arguments.of(EventTypes.LEAD_DELIVERY_FAILED, LEAD, AGENT, Map.of(
                         "adapter", "flaky", "attempts", 3, "reason", "simulated CRM timeout")),
                 Arguments.of(EventTypes.LEAD_REPLIED, LEAD, AGENT, withNulls(Map.of(
-                        "low", 500000, "high", 540000, "late", false), "message", "deliveredAt")),
+                        "low", 500000, "high", 540000, "late", false, "repliedAt", "2026-10-16T10:30:00Z"), "message", "deliveredAt")),
                 Arguments.of(EventTypes.LEAD_REPLIED, LEAD, AGENT, Map.of(
                         "low", 500000, "high", 540000, "message", "Happy to visit on Tuesday", "late", true,
-                        "deliveredAt", "2026-10-16T09:00:00Z")),
+                        "deliveredAt", "2026-10-16T09:00:00Z", "repliedAt", "2026-10-17T11:00:00Z")),
                 Arguments.of(EventTypes.EVIDENCE_ATTACHED, LEAD, AGENT, Map.of(
                         "packId", UuidV7.prefixed("ep"), "comparablesCount", 8,
                         "comparablesRange", Map.of("low", 485000, "mid", 515000, "high", 560000))),

@@ -12,16 +12,22 @@ Tests check emitted events with `EventSchemas.assertValid(json)` (`src/test/java
 | ValuationRequested | `valuation.requested.v1` | requestId | request | none yet | postcode, outcode, propertyType, bedrooms |
 | AgentsMatched | `valuation.requested.v1` | requestId | request | none yet | agentIds[], eligibilityRule (`slot-holders-for-outcode` \| `seller-selected`) |
 | RequestClosed | `valuation.requested.v1` | requestId | delivery (ALL_LEADS_TERMINAL), comparison (SELLER_SELECTED) | none yet | reason |
-| DeliverLead (command) | `lead.deliver.v1` (+ `-retry-*`, `-dlt`) | leadId | request | delivery | adapter (`ok` \| `slow` \| `flaky`) |
+| DeliverLead (command) | `lead.deliver.v1` (+ `lead.deliver.v1-retry-0`, `lead.deliver.v1-retry-1`, `lead.deliver.v1-dlt`) | leadId | request | delivery | adapter (`ok` \| `slow` \| `flaky`) |
 | LeadDelivered | `lead.events.v1` | requestId | delivery | scorecard | adapter, attempt |
 | LeadDeliveryFailed | `lead.events.v1` | requestId | delivery | scorecard | adapter, attempts, reason (agent-private, never on the seller page) |
-| LeadReplied | `lead.events.v1` | requestId | response | scorecard | low, high, message (nullable), late, deliveredAt (nullable) |
+| LeadReplied | `lead.events.v1` | requestId | response | scorecard | low, high, message (nullable), late, deliveredAt (nullable), repliedAt (the reply time the scorecard uses; `occurredAt` is when the event was written) |
 | EvidenceAttached | `lead.events.v1` | requestId | evidence | scorecard | packId, comparablesCount, comparablesRange {low, mid, high} |
 | LeadExpired | `lead.events.v1` | requestId | delivery | scorecard | replyDueAt |
 | SellerEngaged | `lead.events.v1` | requestId | comparison | scorecard | action (`VIEWED` \| `CONTACTED` \| `VISIT_REQUESTED`) |
 | SellerSelected | `lead.events.v1` | requestId | comparison | scorecard | none (the envelope's leadId is the choice) |
 | VisitBooked | `lead.events.v1` | requestId | outcome | scorecard | visitAt (nullable) |
 | InstructionRecorded | `outcome.recorded.v1` | requestId | outcome | scorecard | leadRef (the leadId the CRM echoes back), source, recordedAt |
+
+## Retry topics
+`@RetryableTopic` makes 3 attempts per lead: attempt 1 on `lead.deliver.v1`, attempt 2 on `lead.deliver.v1-retry-0`,
+attempt 3 on `lead.deliver.v1-retry-1`; a lead that fails all three lands on `lead.deliver.v1-dlt` and becomes
+`LeadDeliveryFailed`. So 3 attempts means 2 retry topics (constants in `Topics`: `LEAD_DELIVER_RETRY_0`,
+`LEAD_DELIVER_RETRY_1`, `LEAD_DELIVER_DLT`).
 
 ## Ordering rule
 Everything about one request is keyed by `requestId`, so it lands on one partition and a consumer sees it in order.

@@ -65,7 +65,9 @@ public class ScorecardProjector {
             case EventTypes.LEAD_DELIVERED -> fact.delivered(occurredAt);
             case EventTypes.LEAD_DELIVERY_FAILED -> { }   // the row exists (it is one of the agent's leads); nothing else
             case EventTypes.LEAD_REPLIED -> {
-                fact.replied(occurredAt, decimal(p.get("low")), decimal(p.get("high")),
+                // the reply time is the payload's repliedAt; occurredAt is only a fallback for an event without one
+                Instant repliedAt = p.get("repliedAt") != null ? instant(p.get("repliedAt")) : occurredAt;
+                fact.replied(repliedAt, decimal(p.get("low")), decimal(p.get("high")),
                         p.get("late") instanceof Boolean b ? b : null, instant(p.get("deliveredAt")));
                 rangeChanged = true;
             }

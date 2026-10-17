@@ -79,6 +79,11 @@
             "null"
           ],
           "format": "date-time"
+        },
+        "repliedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "when the agent replied (the business time the scorecard uses)"
         }
       },
       "required": [
@@ -86,7 +91,8 @@
         "high",
         "message",
         "late",
-        "deliveredAt"
+        "deliveredAt",
+        "repliedAt"
       ]
     }
   }

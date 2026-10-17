@@ -76,6 +76,7 @@ public class ReplyService {
         payload.put("message", reply.message());
         payload.put("late", lead.isLate());
         payload.put("deliveredAt", lead.getDeliveredAt() == null ? null : lead.getDeliveredAt().toString());
+        payload.put("repliedAt", lead.getRepliedAt().toString());   // the business time; occurredAt is when the event was written
         outbox.write(Topics.LEAD_EVENTS, lead.getRequestId(), EventEnvelope.of(EventTypes.LEAD_REPLIED,
                 lead.getRequestId(), lead.getId(), lead.getAgentId(), payload));
 
