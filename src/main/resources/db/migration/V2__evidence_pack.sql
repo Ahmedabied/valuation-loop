@@ -2,6 +2,9 @@
 -- The evidence module owns these rows; the comparison module reads evidence_pack in a SQL join for the seller view.
 -- Exclusions are private to the agent: they record which comparables the agent removed while curating a pack.
 -- Nothing in these tables orders agents; a pack describes comparables, never the agent who attached it.
+-- Rule: at most one ATTACHED pack per lead (a lead may have many built drafts). On Postgres that is a partial unique
+-- index (unique (lead_id) where attached_at is not null), but H2, which the tests run these migrations on, cannot do
+-- a partial unique index, so EvidenceService.attach enforces the rule instead, inside the attach transaction.
 
 -- One pack per build. pack_json is the pack exactly as served to the seller:
 -- {packId, comparables[], comparablesRange{low, mid, high}, dataVintage, method, provenance}.
