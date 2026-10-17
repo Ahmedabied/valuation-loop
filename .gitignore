@@ -11,3 +11,8 @@ data/
 *.zip
 *.csv
 .token
+# logs, pids and run artefacts (scripts/replay.sh writes its snapshot under ~/tools/logs, never here)
+logs/
+*.pid
+scorecard-snapshot.json
+.DS_Store
