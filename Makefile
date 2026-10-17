@@ -11,7 +11,10 @@ PG_PORT    ?= 5433
 PG_DB      ?= valuation_loop
 LOGS       := $(HOME)/tools/logs
 
-.PHONY: help test build run kafka-up kafka-down es-up es-down pg-up pg-down services-up services-down status load demo replay clean-daemons
+.PHONY: help test test-es build run kafka-up kafka-down es-up es-down pg-up pg-down services-up services-down status load stats demo replay clean-daemons
+
+# pgrep/pkill -f match the full command line, and the shell make starts for a recipe has the pattern in ITS command
+# line too, so a plain pattern always finds that shell. "[k]afka" matches the text "kafka" but not the text "[k]afka".
 
 help:
 	@grep -E '^[a-z-]+:' Makefile | cut -d: -f1 | tr '\n' ' '; echo
@@ -20,12 +23,15 @@ help:
 test:
 	./gradlew test -q
 
+test-es:                 # also runs the two live-Elasticsearch tests (needs make es-up)
+	./gradlew test -Pes=true -q
+
 build:
 	./gradlew build -x test -q
 
 run:
 	@free -m | awk 'NR==2 && $$7 < 2500 {print "WARNING: only "$$7" MB RAM available; close something first"}'
-	PG_PASSWORD=$$(cat $(PG_PWFILE)) SPRING_PROFILES_ACTIVE=local ./gradlew bootRun -q
+	PG_PASSWORD=$$(cat $(PG_PWFILE)) SPRING_PROFILES_ACTIVE=local,demo ./gradlew bootRun -q
 
 clean-daemons:
 	./gradlew --stop
@@ -41,22 +47,22 @@ kafka-up:
 	      $(KAFKA_HOME)/config/server.properties > $(KAFKA_DATA)/server.properties; \
 	  $(KAFKA_HOME)/bin/kafka-storage.sh format -t $$($(KAFKA_HOME)/bin/kafka-storage.sh random-uuid) -c $(KAFKA_DATA)/server.properties >/dev/null; \
 	fi
-	@pgrep -f "kafka.Kafka $(KAFKA_DATA)" >/dev/null && echo "kafka already running" || \
+	@pgrep -f "[k]afka.Kafka $(KAFKA_DATA)" >/dev/null && echo "kafka already running" || \
 	  (KAFKA_HEAP_OPTS="-Xms256m -Xmx512m" nohup $(KAFKA_HOME)/bin/kafka-server-start.sh $(KAFKA_DATA)/server.properties > $(LOGS)/kafka.log 2>&1 & \
 	   for i in $$(seq 1 30); do $(KAFKA_HOME)/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 && break; sleep 1; done; echo "kafka up on 9092")
 
 kafka-down:
-	-pkill -f "kafka.Kafka $(KAFKA_DATA)" && echo "kafka stopped"
+	@pkill -f "[k]afka.Kafka $(KAFKA_DATA)" && echo "kafka stopped" || echo "kafka not running"
 
 # ---------- Elasticsearch (single node, security off for local) ----------
 es-up:
 	@mkdir -p $(LOGS)
-	@pgrep -f "org.elasticsearch.bootstrap.Elasticsearch" >/dev/null && echo "es already running" || \
+	@pgrep -f "[o]rg.elasticsearch.bootstrap.Elasticsearch" >/dev/null && echo "es already running" || \
 	  (ES_JAVA_OPTS="-Xms512m -Xmx1g" nohup $(ES_HOME)/bin/elasticsearch -E discovery.type=single-node -E network.host=127.0.0.1 -E xpack.security.enabled=false -E xpack.ml.enabled=false -E http.port=9200 > $(LOGS)/es.log 2>&1 & \
 	   for i in $$(seq 1 60); do curl -s localhost:9200 >/dev/null 2>&1 && break; sleep 2; done; curl -s localhost:9200 | grep -o '"number" : "[^"]*"' | head -1; echo "es up on 9200")
 
 es-down:
-	-pkill -f "org.elasticsearch.bootstrap.Elasticsearch" && echo "es stopped"
+	@pkill -f "[o]rg.elasticsearch.bootstrap.Elasticsearch" && echo "es stopped" || echo "es not running"
 
 # ---------- Postgres (user-space binaries, no root) ----------
 # Listens on 127.0.0.1 only; TCP needs the scram password in $(PG_PWFILE) (mode 600, generated once);
@@ -80,17 +86,23 @@ services-up: pg-up kafka-up es-up
 services-down: es-down kafka-down pg-down
 
 status:
-	@pgrep -f "kafka.Kafka" >/dev/null && echo "kafka: up" || echo "kafka: down"
+	@pgrep -f "[k]afka.Kafka" >/dev/null && echo "kafka: up" || echo "kafka: down"
 	@curl -s localhost:9200 >/dev/null 2>&1 && echo "es: up" || echo "es: down"
 	@$(PG_HOME)/bin/pg_ctl -D $(PG_DATA) status >/dev/null 2>&1 && echo "postgres: up" || echo "postgres: down"
 	@free -m | awk 'NR==2{print "ram available: "$$7" MB"}'
 
 # ---------- data and demo (filled in as the modules land) ----------
+# loader profile: Elasticsearch only (in-memory H2, no Kafka, no web port); see application-loader.yml
 load:
-	PG_PASSWORD=$$(cat $(PG_PWFILE)) SPRING_PROFILES_ACTIVE=local ./gradlew bootRun -q --args="--loader.run=true"
+	SPRING_PROFILES_ACTIVE=loader ./gradlew bootRun -q --args="--loader.run=true"
+
+stats:                   # the comparables-range width statistic (the README's number), from the loaded index
+	SPRING_PROFILES_ACTIVE=loader ./gradlew bootRun -q --args="--loader.stats=true"
 
 demo:
 	@echo "make demo: implemented on build day 2 (scenario runner + comparison + scorecard)"
 
+# rebuild scorecard_fact from the topics (ScorecardReplay): truncate, reset offsets, replay, write a snapshot, exit
 replay:
-	@echo "make replay: implemented on build day 2"
+	@mkdir -p $(LOGS)
+	PG_PASSWORD=$$(cat $(PG_PWFILE)) SPRING_PROFILES_ACTIVE=local,demo ./gradlew bootRun -q --args="--scorecard.replay=true --valuationloop.scorecard.listener.auto-startup=false --scorecard.replay.snapshot=$(LOGS)/scorecard-snapshot.json --scorecard.replay.exit=true"
