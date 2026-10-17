@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ConsumerGroupDescription;
 import org.apache.kafka.clients.admin.MemberDescription;
-import org.apache.kafka.common.ConsumerGroupState;
+import org.apache.kafka.common.GroupState;
 import org.apache.kafka.common.utils.Utils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -85,7 +85,7 @@ public class DeliveryControl {
             long assigned = group.members().stream().map(MemberDescription::assignment)
                     .flatMap(a -> a.topicPartitions().stream())
                     .filter(tp -> tp.topic().equals(Topics.LEAD_DELIVER)).count();
-            return group.state() == ConsumerGroupState.STABLE && assigned == partitions;
+            return group.groupState() == GroupState.STABLE && assigned == partitions;
         } catch (Exception e) {
             return false;   // broker busy or group not there yet: the caller polls again
         }

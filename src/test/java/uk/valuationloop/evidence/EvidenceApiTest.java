@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static uk.valuationloop.evidence.FakeEvidenceSources.sale;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -17,7 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -92,7 +92,7 @@ class EvidenceApiTest {
     private String buildPack(AgentLead lead) throws Exception {
         String body = mvc.perform(post(base(AGENT, lead))).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.readTree(body).get("packId").asText();
+        return json.readTree(body).get("packId").asString();
     }
 
     @Test
@@ -109,7 +109,7 @@ class EvidenceApiTest {
                 .andExpect(jsonPath("$.pack.comparables[1].floorAreaM2").doesNotExist())
                 .andExpect(jsonPath("$.attachedAt").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
-        String packId = json.readTree(created).get("packId").asText();
+        String packId = json.readTree(created).get("packId").asString();
         assertThat(packId).startsWith("ep_");
 
         // the agent drops the 2.5m outlier: range from the remaining four, exclusion recorded privately
@@ -146,7 +146,7 @@ class EvidenceApiTest {
         assertThat(event.getPartitionKey()).isEqualTo(lead.getRequestId());
         EventSchemas.assertValid(event.getPayload());
         JsonNode payload = json.readTree(event.getPayload()).get("payload");
-        assertThat(payload.get("packId").asText()).isEqualTo(packId);
+        assertThat(payload.get("packId").asString()).isEqualTo(packId);
         assertThat(payload.get("comparablesCount").asInt()).isEqualTo(4);
         assertThat(payload.at("/comparablesRange/mid").asLong()).isEqualTo(650_000);
     }
@@ -202,7 +202,7 @@ class EvidenceApiTest {
                 .andExpect(jsonPath("$.pack.comparablesRange").isEmpty())
                 .andExpect(jsonPath("$.pack.rangeNote").value("fewer than 3 comparables: no range is shown"))
                 .andReturn().getResponse().getContentAsString();
-        String packId = json.readTree(created).get("packId").asText();
+        String packId = json.readTree(created).get("packId").asString();
         mvc.perform(post(base(AGENT, lead) + "/" + packId + "/attach")).andExpect(status().isConflict());
         assertThat(leads.findById(lead.getId()).orElseThrow().getState()).isEqualTo(LeadState.REPLIED);
     }

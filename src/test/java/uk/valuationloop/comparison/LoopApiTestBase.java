@@ -3,15 +3,15 @@ package uk.valuationloop.comparison;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,7 +36,7 @@ import uk.valuationloop.outbox.Topics;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@EmbeddedKafka(kraft = true, partitions = 2,
+@EmbeddedKafka(partitions = 2,
         topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER, Topics.LEAD_EVENTS, Topics.OUTCOME_RECORDED})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:loop_api_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
@@ -65,7 +65,7 @@ public abstract class LoopApiTestBase {
                         .content(json.writeValueAsString(body)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.readTree(response).get("requestId").asText();
+        return json.readTree(response).get("requestId").asString();
     }
 
     /** Drives the lead CREATED -> DELIVERING -> DELIVERED, as the delivery worker would after an ok adapter call. */

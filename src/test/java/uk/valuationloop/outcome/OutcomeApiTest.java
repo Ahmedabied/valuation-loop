@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -63,7 +63,7 @@ class OutcomeApiTest extends LoopApiTestBase {
         assertThat(booked).hasSize(1);
         assertThat(booked.get(0).getTopic()).isEqualTo(Topics.LEAD_EVENTS);
         EventSchemas.assertValid(booked.get(0).getPayload());
-        assertThat(tree(booked.get(0).getPayload()).at("/payload/visitAt").asText()).isEqualTo("2026-10-22T09:30:00Z");
+        assertThat(tree(booked.get(0).getPayload()).at("/payload/visitAt").asString()).isEqualTo("2026-10-22T09:30:00Z");
         assertThat(leads.findById(lead).orElseThrow().getState()).isEqualTo(LeadState.VISIT_BOOKED);
     }
 
@@ -97,11 +97,11 @@ class OutcomeApiTest extends LoopApiTestBase {
         assertThat(recorded.get(0).getTopic()).isEqualTo(Topics.OUTCOME_RECORDED);
         EventSchemas.assertValid(recorded.get(0).getPayload());
         JsonNode envelope = tree(recorded.get(0).getPayload());
-        assertThat(envelope.path("leadId").asText()).isEqualTo(lead);
-        assertThat(envelope.path("agentId").asText()).isEqualTo(AGENT);
-        assertThat(envelope.at("/payload/leadRef").asText()).isEqualTo(lead);
-        assertThat(envelope.at("/payload/source").asText()).isEqualTo("fake-crm");
-        assertThat(envelope.at("/payload/recordedAt").asText()).isEqualTo("2026-10-20T10:15:00Z");
+        assertThat(envelope.path("leadId").asString()).isEqualTo(lead);
+        assertThat(envelope.path("agentId").asString()).isEqualTo(AGENT);
+        assertThat(envelope.at("/payload/leadRef").asString()).isEqualTo(lead);
+        assertThat(envelope.at("/payload/source").asString()).isEqualTo("fake-crm");
+        assertThat(envelope.at("/payload/recordedAt").asString()).isEqualTo("2026-10-20T10:15:00Z");
         assertThat(leads.findById(lead).orElseThrow().getInstructedAt()).isNotNull();
     }
 

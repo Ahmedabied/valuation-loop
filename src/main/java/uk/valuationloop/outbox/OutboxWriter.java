@@ -1,7 +1,7 @@
 package uk.valuationloop.outbox;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -31,7 +31,7 @@ public class OutboxWriter {
         try {
             String json = objectMapper.writeValueAsString(envelope);
             return repository.save(new OutboxEvent(envelope.eventId(), topic, partitionKey, envelope.eventType(), json, Instant.now()));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("event payload is not serialisable: " + envelope.eventType(), e);
         }
     }
