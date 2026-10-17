@@ -245,7 +245,8 @@ Model answers are short on purpose. Rewrite each in your own words before the in
 7. **What about the data licences?** PPD, Code-Point Open and the non-address EPC fields are OGL with attribution
    strings, shown in the README and in every pack. EPC address fields are OS and Royal Mail restricted, for energy
    performance purposes only: here they are hashed in loader memory for the join and never stored. That join is still
-   a use of them outside that purpose, which is why production would use Rightmove's own address licences.
+   a use of them outside that purpose, which is why production would use Rightmove's own address licences or run
+   with `loader.epc.enabled=false` (the loader then skips the EPC file; property type comes from PPD only).
 8. **What does the demo not prove?** Business impact. Agents, CRMs, sellers and outcomes are simulated. It proves the
    mechanics and gives the product team the query to run on real traffic.
 9. **What changes at 10x load?** More partitions and listener concurrency; several relay instances (SKIP LOCKED already

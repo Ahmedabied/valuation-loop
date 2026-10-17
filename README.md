@@ -173,7 +173,10 @@ agent and every query is scoped to it, so another agent's lead is a 404. Errors 
   certificate's address fields are used only in the loader's memory, as a hashed normalised address
   key for the join, and are never stored, indexed, logged or committed.
 - Data vintage on every pack: `ppd-2024-2026+epc-2026-10`.
-- In production Rightmove would use its own address licences. This demo relies on the non-commercial permission.
+- **The EPC decision.** The EPC register limits use of its address fields to purposes related to the energy
+  performance of buildings. This demo uses EPC addresses only in memory, to join floor area to sales, and is a
+  non-commercial demonstration. A production deployment would use the operator's own address licences (Rightmove has
+  them) or run with `loader.epc.enabled=false`, which the loader supports.
 - The raw downloads live outside the repo (`../data-raw/`) and are never committed.
 
 ## Personal data
