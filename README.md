@@ -20,7 +20,7 @@ The design is in [docs/RFC-001-valuation-loop.md](docs/RFC-001-valuation-loop.md
 | 2 | Every reply can carry an evidence pack built to one standard from real public data, chosen and curated by the agent, machine-readable, with provenance. | `evidence/ComparablesQueryTest.missingFloorAreaGetsHalfWeightInTheSameQuery`, `evidence/ComparablesRankingEsTest.floorAreaMatchRanksAboveMissingFloorArea` and `packFromLiveEsHasProvenanceAndAttachEmitsASchemaValidEvent` (live Elasticsearch) |
 | 3 | The seller's choice, the visit and the instruction join back to the lead even when late and out of order, and one replayable query answers "do evidenced answers win the seller, and at what price gap?". | `scorecard/ScorecardReplayTest.outOfOrderLateAndDuplicateEventsProjectDeterministicallyAndReplayRebuildsIdenticalFacts`, `scorecard/ProductQueryTest.sharesCapturedByTheHighestRangeReplySplitByEvidence` |
 
-All test paths are under `src/test/java/uk/valuationloop/`. There are 125 tests; the two live-Elasticsearch ones run
+All test paths are under `src/test/java/uk/valuationloop/`. There are 131 tests; the two live-Elasticsearch ones run
 only with `make test-es` (`./gradlew test -Pes=true`).
 
 ## The real number
@@ -101,7 +101,7 @@ Gradle comes from the wrapper (`./gradlew`, Gradle 8.14.3).
 ### Steps
 
 ```
-make test            # 125 tests: 123 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
+make test            # 131 tests: 129 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
 make services-up     # Postgres on 5433, Kafka on 9092, Elasticsearch on 9200 (make status to check)
 make test-es         # the same plus the two live-Elasticsearch tests (needs Elasticsearch up)
 make load            # load Wandsworth + Lambeth into Elasticsearch (about 23 s; make demo runs it if the index is missing)
