@@ -11,6 +11,10 @@ spring:
       ddl-auto: validate          # Flyway owns the schema; Hibernate only checks it matches the entities
   flyway:
     enabled: true
+    # Pending versions apply in order (V4 drop processed_event, then V5 completion_match), so a database built before
+    # either still upgrades in place. Kept false (the default) on purpose: a version older than the database's current
+    # one is refused, never slipped in later (docs/DEMO.md "When something is off").
+    out-of-order: false
   kafka:
     bootstrap-servers: 127.0.0.1:9092
     producer:
