@@ -24,7 +24,6 @@ import uk.valuationloop.comparison.ComparisonView;
 import uk.valuationloop.comparison.SellerActions;
 import uk.valuationloop.comparison.SellerActions.EngagementAction;
 import uk.valuationloop.delivery.DeadlineService;
-import uk.valuationloop.delivery.FlakyAdapter;
 import uk.valuationloop.delivery.OptimisticLockRetry;
 import uk.valuationloop.evidence.Comparable;
 import uk.valuationloop.evidence.ComparablesRange;
@@ -34,7 +33,6 @@ import uk.valuationloop.lead.AgentLead;
 import uk.valuationloop.lead.AgentLeadRepository;
 import uk.valuationloop.lead.LeadState;
 import uk.valuationloop.observability.EventTracing;
-import uk.valuationloop.observability.LoopMetrics;
 import uk.valuationloop.outcome.OutcomeService;
 import uk.valuationloop.request.PropertyType;
 import uk.valuationloop.request.ValuationRequest;
@@ -84,9 +82,8 @@ public class SimulatorScenarios {
     private final SellerActions seller;
     private final OutcomeService outcomes;
     private final DeadlineService deadlines;
-    private final FlakyAdapter flaky;
+    private final DeliveryControl delivery;
     private final ScorecardFactRepository facts;
-    private final LoopMetrics metrics;
     private final ObjectMapper json;
     private final Clock clock;
     private final KafkaListenerEndpointRegistry listeners;
@@ -95,8 +92,8 @@ public class SimulatorScenarios {
     public SimulatorScenarios(ValuationRequestService requestService, ValuationRequestRepository requests,
                               AgentLeadRepository leads, AgentDirectory directory, ReplyService replies,
                               EvidenceService evidence, ComparisonQuery comparison, SellerActions seller,
-                              OutcomeService outcomes, DeadlineService deadlines, FlakyAdapter flaky,
-                              ScorecardFactRepository facts, LoopMetrics metrics, ObjectMapper json, Clock clock,
+                              OutcomeService outcomes, DeadlineService deadlines, DeliveryControl delivery,
+                              ScorecardFactRepository facts, ObjectMapper json, Clock clock,
                               KafkaListenerEndpointRegistry listeners,
                               @Value("${valuationloop.simulator.postcode:SW11 1AA}") String postcode) {
         this.requestService = requestService;
@@ -109,9 +106,8 @@ public class SimulatorScenarios {
         this.seller = seller;
         this.outcomes = outcomes;
         this.deadlines = deadlines;
-        this.flaky = flaky;
+        this.delivery = delivery;
         this.facts = facts;
-        this.metrics = metrics;
         this.json = json;
         this.clock = clock;
         this.listeners = listeners;
@@ -125,7 +121,7 @@ public class SimulatorScenarios {
                     "Claims 1-3: delivery through a flaky CRM, an evidenced reply, the seller's choice joined to the instruction",
                     AGENT_OK, AGENT_OK_2, AGENT_FLAKY));
             case "slow" -> EventTracing.newTrace("simulator.slow", () -> fullLoop("slow",
-                    "Claim 1: a slow CRM delays its own lead; delivery latency per lead is measured",
+                    "Claim 1: a slow CRM delays only its own lead; the ok leads, on other partitions and threads, do not wait",
                     AGENT_OK, AGENT_SLOW, AGENT_OK_2));
             case "flaky-crm" -> EventTracing.newTrace("simulator.flaky-crm", this::flakyCrm);
             case "late-reply" -> EventTracing.newTrace("simulator.late-reply", this::lateReply);
@@ -150,8 +146,12 @@ public class SimulatorScenarios {
         Map<String, Object> checks = new LinkedHashMap<>();
         String requestId = createRequest(scenario, List.of(highAgent, evidencedAgent, plainAgent));
 
-        awaitLeads(requestId, "every lead DELIVERED", ls -> ls.stream().allMatch(l -> l.getState() == LeadState.DELIVERED));
+        List<AgentLead> delivered = awaitLeads(requestId, "every lead DELIVERED",
+                ls -> ls.stream().allMatch(l -> l.getState() == LeadState.DELIVERED));
         checks.put("all leads delivered", true);
+        if (scenario.equals("slow")) {
+            slowChecks(delivered, checks);
+        }
         String highLead = leadOf(requestId, highAgent).getId();
         String evidencedLead = leadOf(requestId, evidencedAgent).getId();
         String plainLead = leadOf(requestId, plainAgent).getId();
@@ -203,19 +203,19 @@ public class SimulatorScenarios {
     private ScenarioReport flakyCrm() {
         long started = System.nanoTime();
         Map<String, Object> checks = new LinkedHashMap<>();
-        double dltBefore = metrics.dltRecordsSoFar();
+        double dltBefore = delivery.dltRecordsSoFar();
         String requestId;
-        flaky.overrideFailuresPerLead(1_000);   // explicit and temporary: restored below whatever happens
+        delivery.overrideFlakyFailures(1_000);   // explicit and temporary: restored below whatever happens
         try {
             requestId = createRequest("flaky-crm", List.of(AGENT_OK, AGENT_FLAKY));
             awaitLeads(requestId, "flaky lead DELIVERY_FAILED and ok lead DELIVERED", ls ->
                     stateOf(ls, AGENT_FLAKY) == LeadState.DELIVERY_FAILED && stateOf(ls, AGENT_OK) == LeadState.DELIVERED);
         } finally {
-            flaky.clearOverride();
+            delivery.clearFlakyOverride();
         }
-        awaitTrue("dlt_records counts the dead letter", () -> metrics.dltRecordsSoFar() >= dltBefore + 1);
+        awaitTrue("dlt_records counts the dead letter", () -> delivery.dltRecordsSoFar() >= dltBefore + 1);
         checks.put("flaky lead attempts before the DLT", leadOf(requestId, AGENT_FLAKY).getDeliveryAttempts());
-        checks.put("dlt_records_total (before -> after)", (long) dltBefore + " -> " + (long) metrics.dltRecordsSoFar());
+        checks.put("dlt_records_total (before -> after)", (long) dltBefore + " -> " + (long) delivery.dltRecordsSoFar());
 
         String okLead = leadOf(requestId, AGENT_OK).getId();
         reply(AGENT_OK, okLead, BigDecimal.valueOf(585_000), BigDecimal.valueOf(640_000), "Happy to visit this week.");
@@ -256,6 +256,30 @@ public class SimulatorScenarios {
         checks.put("scorecard fact of the late lead", factExcerpt(fact));
         return report("late-reply", "Claim 3: a reply after the deadline still joins to its lead; late is agent-private",
                 requestId, checks, AGENT_OK_2, started);
+    }
+
+    /**
+     * The slow scenario's own evidence: each lead's lead.deliver.v1 partition (computed as the producer does, from the
+     * leadId) next to its delivery time, and whether the ok leads were delivered before the slow one finished. Two
+     * leads on partitions owned by the same consumer thread would still queue; the line shows it when that happens.
+     */
+    private void slowChecks(List<AgentLead> ls, Map<String, Object> checks) {
+        int partitions = delivery.deliverPartitions();
+        Map<String, String> perLead = new LinkedHashMap<>();
+        long slowMs = 0;
+        long okMaxMs = 0;
+        for (AgentLead l : ls) {
+            long ms = Duration.between(l.getCreatedAt(), l.getDeliveredAt()).toMillis();
+            String adapter = directory.byId(l.getAgentId()).map(AgentDirectory.Agent::adapter).orElse("?");
+            perLead.put(l.getAgentId(), adapter + " p" + DeliveryControl.partitionOf(l.getId(), partitions) + " " + ms + " ms");
+            if (adapter.equals("slow")) {
+                slowMs = ms;
+            } else {
+                okMaxMs = Math.max(okMaxMs, ms);
+            }
+        }
+        checks.put("lead.deliver.v1 partition, delivery (of " + partitions + ")", List.copyOf(perLead.values()));
+        checks.put("ok leads delivered before the slow one", okMaxMs < slowMs);
     }
 
     // ---------- steps ----------
@@ -304,13 +328,22 @@ public class SimulatorScenarios {
 
     /**
      * Right after startup the consumers are still joining their groups (a few seconds on a fresh broker); a scenario
-     * started then would count that wait as delivery time. So first wait until every running listener container
-     * (delivery, its retry topics, scorecard) has partitions assigned.
+     * started then would count that wait as delivery time. So first wait until every listener container running in
+     * THIS process (delivery and its retry topics, scorecard) has partitions assigned.
+     *
+     * When the jar runs split, the delivery consumers are in the worker process and this one runs only the scorecard
+     * consumer, so a local check says nothing about delivery. Then the broker is asked instead: group "delivery" must
+     * be stable with every lead.deliver.v1 partition assigned. Either way, each scenario then waits for its own leads
+     * to reach DELIVERED (awaitLeads), which is the real proof that the other process is consuming.
      */
     private void awaitConsumersAssigned() {
-        awaitTrue("the Kafka consumers to get their partitions", () -> listeners.getListenerContainers().stream()
+        awaitTrue("the Kafka consumers in this process to get their partitions", () -> listeners.getListenerContainers().stream()
                 .filter(MessageListenerContainer::isRunning)
                 .allMatch(c -> c.getAssignedPartitions() != null && !c.getAssignedPartitions().isEmpty()));
+        if (delivery.deliveryIsRemote()) {
+            awaitTrue("consumer group 'delivery' (worker process) to hold every lead.deliver.v1 partition",
+                    delivery::deliveryGroupHasAllPartitions);
+        }
     }
 
     private ScorecardFact awaitFact(String leadId, String what, Predicate<ScorecardFact> done) {
