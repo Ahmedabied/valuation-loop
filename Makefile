@@ -1,0 +1,90 @@
+# Single entry point for running Valuation Loop on this box (no Docker). See ../HANDOFF.md §6.
+SHELL := /bin/bash
+export JAVA_HOME ?= $(HOME)/jdks/jdk-21.0.12.1+1
+
+KAFKA_HOME ?= $(HOME)/tools/kafka_2.13-4.3.1
+KAFKA_DATA ?= $(HOME)/tools/kafka-data
+ES_HOME    ?= $(HOME)/tools/elasticsearch-8.19.4
+PG_HOME    ?= $(HOME)/tools/postgres
+PG_DATA    ?= $(HOME)/tools/pgdata
+PG_PORT    ?= 5433
+PG_DB      ?= valuation_loop
+LOGS       := $(HOME)/tools/logs
+
+.PHONY: help test build run kafka-up kafka-down es-up es-down pg-up pg-down services-up services-down status load demo replay clean-daemons
+
+help:
+	@grep -E '^[a-z-]+:' Makefile | cut -d: -f1 | tr '\n' ' '; echo
+
+# ---------- build ----------
+test:
+	./gradlew test -q
+
+build:
+	./gradlew build -x test -q
+
+run:
+	@free -m | awk 'NR==2 && $$7 < 2500 {print "WARNING: only "$$7" MB RAM available; close something first"}'
+	SPRING_PROFILES_ACTIVE=local ./gradlew bootRun -q
+
+clean-daemons:
+	./gradlew --stop
+
+# ---------- Kafka (KRaft, single node) ----------
+kafka-up:
+	@mkdir -p $(KAFKA_DATA) $(LOGS)
+	@if [ ! -f $(KAFKA_DATA)/meta.properties ]; then \
+	  sed -e 's#^log.dirs=.*#log.dirs=$(KAFKA_DATA)#' $(KAFKA_HOME)/config/server.properties > $(KAFKA_DATA)/server.properties; \
+	  $(KAFKA_HOME)/bin/kafka-storage.sh format -t $$($(KAFKA_HOME)/bin/kafka-storage.sh random-uuid) -c $(KAFKA_DATA)/server.properties >/dev/null; \
+	fi
+	@pgrep -f "kafka.Kafka $(KAFKA_DATA)" >/dev/null && echo "kafka already running" || \
+	  (KAFKA_HEAP_OPTS="-Xms256m -Xmx512m" nohup $(KAFKA_HOME)/bin/kafka-server-start.sh $(KAFKA_DATA)/server.properties > $(LOGS)/kafka.log 2>&1 & \
+	   for i in $$(seq 1 30); do $(KAFKA_HOME)/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 && break; sleep 1; done; echo "kafka up on 9092")
+
+kafka-down:
+	-pkill -f "kafka.Kafka $(KAFKA_DATA)" && echo "kafka stopped"
+
+# ---------- Elasticsearch (single node, security off for local) ----------
+es-up:
+	@mkdir -p $(LOGS)
+	@pgrep -f "org.elasticsearch.bootstrap.Elasticsearch" >/dev/null && echo "es already running" || \
+	  (ES_JAVA_OPTS="-Xms512m -Xmx1g" nohup $(ES_HOME)/bin/elasticsearch -E discovery.type=single-node -E xpack.security.enabled=false -E xpack.ml.enabled=false -E http.port=9200 > $(LOGS)/es.log 2>&1 & \
+	   for i in $$(seq 1 60); do curl -s localhost:9200 >/dev/null 2>&1 && break; sleep 2; done; curl -s localhost:9200 | grep -o '"number" : "[^"]*"' | head -1; echo "es up on 9200")
+
+es-down:
+	-pkill -f "org.elasticsearch.bootstrap.Elasticsearch" && echo "es stopped"
+
+# ---------- Postgres (user-space binaries, no root) ----------
+pg-up:
+	@mkdir -p $(LOGS)
+	@if [ ! -f $(PG_DATA)/PG_VERSION ]; then $(PG_HOME)/bin/initdb -D $(PG_DATA) -U postgres --auth=trust -E UTF8 >/dev/null && echo "initdb done"; fi
+	@$(PG_HOME)/bin/pg_ctl -D $(PG_DATA) status >/dev/null 2>&1 && echo "postgres already running" || \
+	  $(PG_HOME)/bin/pg_ctl -D $(PG_DATA) -o "-p $(PG_PORT) -k /tmp" -l $(LOGS)/pg.log start >/dev/null
+	@$(PG_HOME)/bin/psql -h /tmp -p $(PG_PORT) -U postgres -tc "select 1 from pg_database where datname='$(PG_DB)'" | grep -q 1 || \
+	  $(PG_HOME)/bin/psql -h /tmp -p $(PG_PORT) -U postgres -c "create database $(PG_DB)" >/dev/null
+	@echo "postgres up on $(PG_PORT), db $(PG_DB)"
+
+pg-down:
+	-$(PG_HOME)/bin/pg_ctl -D $(PG_DATA) stop -m fast >/dev/null && echo "postgres stopped"
+
+psql:
+	$(PG_HOME)/bin/psql -h /tmp -p $(PG_PORT) -U postgres $(PG_DB)
+
+services-up: pg-up kafka-up es-up
+services-down: es-down kafka-down pg-down
+
+status:
+	@pgrep -f "kafka.Kafka" >/dev/null && echo "kafka: up" || echo "kafka: down"
+	@curl -s localhost:9200 >/dev/null 2>&1 && echo "es: up" || echo "es: down"
+	@$(PG_HOME)/bin/pg_ctl -D $(PG_DATA) status >/dev/null 2>&1 && echo "postgres: up" || echo "postgres: down"
+	@free -m | awk 'NR==2{print "ram available: "$$7" MB"}'
+
+# ---------- data and demo (filled in as the modules land) ----------
+load:
+	SPRING_PROFILES_ACTIVE=local ./gradlew bootRun -q --args="--loader.run=true"
+
+demo:
+	@echo "make demo: implemented on build day 2 (scenario runner + comparison + scorecard)"
+
+replay:
+	@echo "make replay: implemented on build day 2"
