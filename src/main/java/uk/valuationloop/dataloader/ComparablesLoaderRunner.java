@@ -32,7 +32,8 @@ import uk.valuationloop.request.Postcodes;
  * <pre>
  * 1. stream the PPD yearly files, keep Wandsworth + Lambeth category A (A/C/D rules in PpdTransactions)
  * 2. read Code-Point Open centroids for the SW and SE areas, OSGB36 -> WGS84
- * 3. read the EPC file into hash-keyed attributes (EpcLookup; addresses never leave that step)
+ * 3. read the EPC file into hash-keyed attributes (EpcLookup; addresses never leave that step);
+ *    skipped entirely when loader.epc.enabled=false (then no EPC fields, property type from PPD only)
  * 4. one ComparableDocument per kept sale, bulk-indexed into comparables-v1
  * 5. the centroids into postcode-centroids-v1, for the pack builder's postcode lookup
  * </pre>
@@ -73,8 +74,7 @@ public class ComparablesLoaderRunner implements ApplicationRunner {
         Map<String, GeoPoint> centroids = CodePointReader.read(Path.of(props.codepointZip()), props.codepointAreas());
         log.info("Code-Point: centroids loaded={} for areas {}", centroids.size(), props.codepointAreas());
 
-        EpcLookup epc = EpcLookup.load(Path.of(props.epcFile()));
-        log.info("EPC: certificates read={} latest lodgement={}", epc.certificates(), epc.latestLodgement());
+        EpcLookup epc = epcStep(props);
 
         String vintage = dataVintage(sales, epc);
         writer.ensureIndex(evidence.index(), "/es/comparables-v1.json", props.recreate());
@@ -161,11 +161,29 @@ public class ComparablesLoaderRunner implements ApplicationRunner {
         return written;
     }
 
-    /** e.g. "ppd-2024-2026+epc-2026-09": the PPD years present and the latest EPC lodgement month. */
+    /**
+     * Step 3. With loader.epc.enabled=false the EPC file is never opened (it need not even exist): every sale
+     * matches Tier.NONE, so no document gets floor area, EPC rating or a refined property type.
+     */
+    static EpcLookup epcStep(LoaderProperties props) throws IOException {
+        if (!props.epc().enabled()) {
+            log.info("EPC join disabled (loader.epc.enabled=false): property type from PPD only, no floor area");
+            return EpcLookup.disabled();
+        }
+        EpcLookup epc = EpcLookup.load(Path.of(props.epcFile()));
+        log.info("EPC: certificates read={} latest lodgement={}", epc.certificates(), epc.latestLodgement());
+        return epc;
+    }
+
+    /**
+     * e.g. "ppd-2024-2026+epc-2026-09": the PPD years present and the latest EPC lodgement month;
+     * just "ppd-2024-2026" when no EPC data was joined.
+     */
     static String dataVintage(PpdTransactions sales, EpcLookup epc) {
         int first = sales.rows().stream().mapToInt(r -> r.dateOfTransfer().getYear()).min().orElse(0);
         int last = sales.rows().stream().mapToInt(r -> r.dateOfTransfer().getYear()).max().orElse(0);
-        return "ppd-" + first + "-" + last + "+epc-" + epc.latestLodgement();
+        String ppd = "ppd-" + first + "-" + last;
+        return epc.latestLodgement() == null ? ppd : ppd + "+epc-" + epc.latestLodgement();
     }
 
     private static String normalisedOrNull(String postcode) {

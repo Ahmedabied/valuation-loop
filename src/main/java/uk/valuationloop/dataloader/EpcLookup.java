@@ -78,6 +78,11 @@ public final class EpcLookup {
     }
 
     /** Reads the CSV (header row with upper-case names, as tools/epc_filter.py writes it). */
+    /** The lookup used when loader.epc.enabled=false: no certificates, every sale is Tier.NONE. */
+    public static EpcLookup disabled() {
+        return new EpcLookup(Map.of(), Map.of(), Map.of(), 0, null);
+    }
+
     public static EpcLookup load(Path csv) throws IOException {
         try (BufferedReader in = Files.newBufferedReader(csv, StandardCharsets.UTF_8)) {
             return load(in);
