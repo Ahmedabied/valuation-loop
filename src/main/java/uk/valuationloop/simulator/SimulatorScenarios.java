@@ -11,8 +11,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.stereotype.Service;
 import uk.valuationloop.agent.AgentDirectory;
 import uk.valuationloop.comparison.ComparisonQuery;
@@ -57,6 +61,8 @@ import uk.valuationloop.simulator.ScenarioReport.LeadLine;
 @Profile("demo")
 public class SimulatorScenarios {
 
+    private static final Logger log = LoggerFactory.getLogger(SimulatorScenarios.class);
+
     public static final List<String> NAMES = List.of("ok", "slow", "flaky-crm", "late-reply");
 
     static final String AGENT_OK = "ag_fictional_01";
@@ -83,6 +89,7 @@ public class SimulatorScenarios {
     private final LoopMetrics metrics;
     private final ObjectMapper json;
     private final Clock clock;
+    private final KafkaListenerEndpointRegistry listeners;
     private final String postcode;
 
     public SimulatorScenarios(ValuationRequestService requestService, ValuationRequestRepository requests,
@@ -90,6 +97,7 @@ public class SimulatorScenarios {
                               EvidenceService evidence, ComparisonQuery comparison, SellerActions seller,
                               OutcomeService outcomes, DeadlineService deadlines, FlakyAdapter flaky,
                               ScorecardFactRepository facts, LoopMetrics metrics, ObjectMapper json, Clock clock,
+                              KafkaListenerEndpointRegistry listeners,
                               @Value("${valuationloop.simulator.postcode:SW11 1AA}") String postcode) {
         this.requestService = requestService;
         this.requests = requests;
@@ -106,10 +114,12 @@ public class SimulatorScenarios {
         this.metrics = metrics;
         this.json = json;
         this.clock = clock;
+        this.listeners = listeners;
         this.postcode = postcode;
     }
 
     public ScenarioReport run(String name) {
+        awaitConsumersAssigned();
         return switch (name) {
             case "ok" -> EventTracing.newTrace("simulator.ok", () -> fullLoop("ok",
                     "Claims 1-3: delivery through a flaky CRM, an evidenced reply, the seller's choice joined to the instruction",
@@ -251,6 +261,7 @@ public class SimulatorScenarios {
     // ---------- steps ----------
 
     private String createRequest(String scenario, List<String> agentIds) {
+        log.info("scenario {}: seller asks {} for a valuation", scenario, agentIds);
         var created = requestService.create(new ValuationRequestService.CreateCommand(
                 "sim-" + scenario + "-" + Long.toString(System.currentTimeMillis(), 36), postcode, PropertyType.FLAT,
                 2, FLOOR_AREA_M2, agentIds));
@@ -289,6 +300,17 @@ public class SimulatorScenarios {
             }
             sleep();
         }
+    }
+
+    /**
+     * Right after startup the consumers are still joining their groups (a few seconds on a fresh broker); a scenario
+     * started then would count that wait as delivery time. So first wait until every running listener container
+     * (delivery, its retry topics, scorecard) has partitions assigned.
+     */
+    private void awaitConsumersAssigned() {
+        awaitTrue("the Kafka consumers to get their partitions", () -> listeners.getListenerContainers().stream()
+                .filter(MessageListenerContainer::isRunning)
+                .allMatch(c -> c.getAssignedPartitions() != null && !c.getAssignedPartitions().isEmpty()));
     }
 
     private ScorecardFact awaitFact(String leadId, String what, Predicate<ScorecardFact> done) {
@@ -336,6 +358,7 @@ public class SimulatorScenarios {
         String scorecardAgent = request.getSelectedLeadId() == null ? fallbackAgent
                 : ls.stream().filter(l -> l.getId().equals(request.getSelectedLeadId())).map(AgentLead::getAgentId).findFirst().orElse(fallbackAgent);
         AgentScorecard scorecard = AgentScorecard.of(scorecardAgent, facts.findByAgentId(scorecardAgent));
+        log.info("scenario {}: done, request {} is {}", scenario, requestId, request.getState());
         return new ScenarioReport(scenario, proves, requestId, EventTracing.currentTraceId(), request.getState().name(),
                 lines, request.getSelectedLeadId(), instructed, scorecard, checks,
                 Duration.ofNanos(System.nanoTime() - startedNanos).toMillis());
