@@ -104,7 +104,7 @@ class EvidenceApiTest {
                 .andExpect(jsonPath("$.pack.comparables.length()").value(5))
                 .andExpect(jsonPath("$.pack.comparablesRange.mid").value(700_000))
                 .andExpect(jsonPath("$.pack.method").value("lower quartile / median / upper quartile of attached comparables"))
-                .andExpect(jsonPath("$.pack.provenance.attributions.length()").value(2))
+                .andExpect(jsonPath("$.pack.provenance.attributions.length()").value(3))
                 .andExpect(jsonPath("$.pack.provenance.index").value("comparables-v1"))
                 .andExpect(jsonPath("$.pack.comparables[1].floorAreaM2").doesNotExist())
                 .andExpect(jsonPath("$.attachedAt").doesNotExist())

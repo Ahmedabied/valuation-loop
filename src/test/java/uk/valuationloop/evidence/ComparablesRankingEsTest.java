@@ -113,7 +113,7 @@ class ComparablesRankingEsTest {
         assertThat(pack.comparables()).extracting(Comparable::ppdTransactionId)
                 .containsExactly("WITH-AREA", "NO-AREA", "FAR-1", "FAR-2");
         assertThat(pack.comparablesRange()).isEqualTo(new ComparablesRange(575_000, 600_000, 625_000));
-        assertThat(pack.provenance().attributions()).containsExactly(Provenance.LAND_REGISTRY, Provenance.CODE_POINT);
+        assertThat(pack.provenance().attributions()).containsExactly(Provenance.LAND_REGISTRY, Provenance.CODE_POINT, Provenance.EPC);
         assertThat(pack.provenance().index()).isEqualTo(INDEX);
         assertThat(pack.provenance().query()).containsEntry("missingFloorAreaWeight", 0.5);
         assertThat(pack.dataVintage()).isEqualTo("ppd-2024-2026+epc-2026-09");

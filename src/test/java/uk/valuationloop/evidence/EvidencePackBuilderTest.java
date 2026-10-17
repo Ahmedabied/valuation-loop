@@ -39,7 +39,7 @@ class EvidencePackBuilderTest {
         assertThat(pack.rangeNote()).isNull();
         assertThat(pack.method()).isEqualTo("lower quartile / median / upper quartile of attached comparables");
         assertThat(pack.dataVintage()).isEqualTo("ppd-2024-2026+epc-2026-09");
-        assertThat(pack.provenance().attributions()).containsExactly(Provenance.LAND_REGISTRY, Provenance.CODE_POINT);
+        assertThat(pack.provenance().attributions()).containsExactly(Provenance.LAND_REGISTRY, Provenance.CODE_POINT, Provenance.EPC);
         assertThat(pack.provenance().index()).isEqualTo("comparables-v1");
         assertThat(pack.provenance().query()).containsEntry("radiusM", 1500).containsEntry("floorAreaM2", 68.0)
                 .containsEntry("missingFloorAreaWeight", 0.5);
