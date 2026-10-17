@@ -19,7 +19,7 @@ against RFC §7 only after you have written it.
 ## Learn day 2
 
 **Morning.** Add one small feature end to end without help (see "The day 2 feature" below). Claude reviews only.
-**Afternoon.** The 20 interview questions, out loud, then in writing. Rewrite the RFC's first page in your words.
+**Afternoon.** The 23 interview questions, out loud, then in writing. Rewrite the RFC's first page in your words.
 **Evening.** Decide the application text and the AI answer (draft at the end). Nothing is sent without your yes.
 
 ## Reading order
@@ -31,7 +31,7 @@ against RFC §7 only after you have written it.
 | 3 | Every `package-info.java` | 10 each | Each module in one breath |
 | 4 | `lead/LeadState`, `LeadEvent`, `LeadTransitions`; `request/RequestState`, `RequestTransitions` | 25, 30, 45, 20, 40 | Both state machines as pure functions |
 | 5 | `lead/LeadTransitionsTest`, `request/RequestTransitionsTest` | 60, 40 | How a transition table is tested |
-| 6 | `src/main/resources/db/migration/V1__core_tables.sql`, `V2__evidence_pack.sql`, `V3__scorecard_fact.sql`, `V4__drop_processed_event.sql` | 70, 45, 30, 4 | The tables, with comments |
+| 6 | `src/main/resources/db/migration/V1__core_tables.sql`, `V2__evidence_pack.sql`, `V3__scorecard_fact.sql`, `V4__drop_processed_event.sql`, `V5__completion_match.sql` | 70, 45, 30, 4, 25 | The tables, with comments |
 | 7 | `request/ValuationRequestController`, `ValuationRequestService`, `ValuationRequest`; `agent/AgentDirectory` | 80, 105, 100, 40 | Step 1 of the loop |
 | 8 | `outbox/EventEnvelope`, `OutboxWriter`, `OutboxEvent`, `OutboxRepository`, `OutboxRelay`, `Topics` | 35, 40, 75, 25, 90, 30 | The outbox |
 | 9 | `outbox/OutboxRelayTest`, `request/ValuationRequestFlowTest` | 100, 155 | The outbox claim, the fan-out |
@@ -48,7 +48,9 @@ against RFC §7 only after you have written it.
 | 20 | `api/ApiErrors`, `src/main/resources/application.yml`, `Makefile`, `build.gradle.kts` | 125, 110, 120, 45 | Plumbing |
 | 21 | `simulator/SimulatorScenarios`, `OutboxGapDemo`, `SimulatorController`, `scripts/demo.sh`, `docs/DEMO.md` | 410, 175, 70, 80, 35 | `make demo` |
 
-Steps 1 to 12 are day 1. Steps 13 to 21 are day 2 morning, before the feature.
+| 22 | Phase 2: `delivery/DeliveryTopics`, `AdapterCaller`, `application-api.yml`, `application-worker.yml`, `scripts/split.sh`; `completion/package-info`, `MatchRule`, `CompletionScanner`; `profiles/ApiWorkerProfilesTest` | 40, 80, 20, 20, 90; 15, 50, 85; 90 | Slow-CRM isolation, the split, the late match (RFC §21) |
+
+Steps 1 to 12 are day 1. Steps 13 to 22 are day 2 morning, before the feature.
 
 ## One request, top down
 
@@ -219,7 +221,7 @@ make each step's test pass before the next:
 Alternative: a new simulator scenario, for example `two-sellers` (two requests in the same outcode at once), added to
 `SimulatorScenarios.NAMES` and `run`, with a check in `simulator/SimulatorScenarioTest`.
 
-## 20 interview questions
+## 23 interview questions
 
 Model answers are short on purpose. Rewrite each in your own words before the interview; do not memorise these.
 
@@ -240,9 +242,9 @@ Model answers are short on purpose. Rewrite each in your own words before the in
    that did would need per-key locking or change-data-capture.
 5. **Why is DeliverLead keyed by leadId but events by requestId?** Delivery is per agent: keying by lead lets one
    request's leads spread over partitions and listener threads, and keeps every copy of one lead's command in order.
-   Events are per request: the scorecard needs them in order for a request. Be honest about v1: one partition and one
-   listener thread, so a slow CRM delays the leads behind it (the `slow` scenario shows it); the fix is partitions,
-   concurrency and a per-CRM timeout.
+   Events are per request: the scorecard needs them in order for a request. v1 had one partition and one listener
+   thread, so a slow CRM delayed the leads behind it; phase 2 added 6 partitions, 3 threads and a 5 s per-call timeout
+   (question 21), and the `slow` scenario now shows the ok leads delivered first.
 6. **Why no ranking of agents?** Agents are the paying customers, and a platform verdict on a named agent built on this
    data is a claim nothing could back. Technically, comparables disagree by a median 28% of value, so a 5 to 10%
    difference between two agents is noise. Eligibility is a lookup; the seller sees evidence in reply order.
@@ -281,7 +283,8 @@ Model answers are short on purpose. Rewrite each in your own words before the in
     day 1: version lines, Jackson 3 imports, spring-kafka 4.x, the Elasticsearch client line.
 17. **How do retries avoid blocking other leads?** Non-blocking retry topics: a failed record is re-published to
     `-retry-0` with a delay and the main partition moves on. Lock conflicts are retried in process and never reach the
-    retry topics. What they do not fix is a slow call: it holds the listener thread while it runs (see question 5).
+    retry topics. What they do not fix is a slow call: it holds its listener thread while it runs, for at most the 5 s timeout, and
+    the other two threads carry on (questions 5 and 21).
 18. **How do you test Kafka without Docker?** `@EmbeddedKafka(kraft = true)` runs a broker in the test JVM; H2 in
     PostgreSQL mode runs the same Flyway migrations. The two Elasticsearch tests need a real node and run with
     `-Pes=true`.
@@ -290,6 +293,19 @@ Model answers are short on purpose. Rewrite each in your own words before the in
 20. **What would a Rightmove engineering manager ask first?** Probably "what did you build and what did the AI build,
     and walk me through the outbox". Answer the first honestly (next section) and the second from memory, then offer to
     change something live.
+
+21. **Why 6 partitions and 3 threads?** Partitions are the unit of parallelism: a group can have at most one active
+    consumer per partition. Six lets me scale to six threads or two worker processes later without repartitioning,
+    which matters because adding partitions moves keys to other partitions. Three threads, each owning two partitions,
+    is what this box can afford, and a slow CRM now holds one thread out of three for at most 5 s.
+22. **Why interrupt on timeout rather than `orTimeout`?** `CompletableFuture.orTimeout` only completes the future
+    exceptionally; the task keeps running and keeps its thread and socket. `AdapterCaller` runs the call on a virtual
+    thread and calls `future.cancel(true)`, which interrupts it, so a sleeping or blocking call actually stops. A call
+    that reached the CRM anyway is safe: the retry sends the same `leadId`, the CRM's idempotency key.
+23. **Why a profile-based split instead of two Gradle modules?** The seam already exists: the processes talk only
+    through Kafka topics and one Postgres. Profiles give one artefact, one schema, one test suite, and the split stays a
+    deployment decision I can undo with a flag. Two modules pay off when teams or release cycles differ; here they would
+    add a shared-library module and duplicated config for no gain. `ApiWorkerProfilesTest` proves the wiring.
 
 ## What I would say about AI pairing (draft, Ahmed decides)
 

@@ -10,7 +10,7 @@ it started. The services stay up; `make services-down` stops them. It can be run
    (adapter, delivery attempts, state, delivery time, reply range, late, evidence attached) and the checks it made.
    | Scenario | What happens | Claim (ARCHITECTURE §0) |
    |---|---|---|
-   | `ok` | 3 agents; the flaky CRM lands on attempt 3 via `-retry-0/-retry-1`. One agent builds a pack from live ES, removes a comparable, replies at its comparables' range and attaches it; the seller views all, asks that agent for a visit and selects it; the visit is booked; the CRM webhook (leadRef) reports the instruction; the scorecard fact shows `instructed=true` | 1, 2, 3 |
+   | `ok` | The request is a real flat that has already sold: the newest SW11 flat sale with a floor area in the index (`request property (a real PPD sale)`: postcode, type, floor area, PPD id; never an EPC field). 3 agents; the flaky CRM lands on attempt 3 via `-retry-0/-retry-1`. One agent builds a pack from live ES, removes a comparable, replies at its comparables' range and attaches it; the seller views all, asks that agent for a visit and selects it; the visit is booked; the CRM webhook (leadRef) reports the instruction; the scorecard fact shows `instructed=true`. Then one Land Registry late-match scan: `completed=true, priceGapPct=<n> (demo: self-match, see completion/package-info; ...)`, the sale matched to itself, because the demo profile widens the window to 400 days (`application-demo.yml`: Price Paid lags about two months; production keeps 30) | 1, 2, 3 |
    | `slow` | same loop with the 2 s CRM; each lead's `lead.deliver.v1` partition and delivery time. Six partitions, three listener threads, keyed by leadId: the ok leads are delivered in a few hundred ms while the slow one takes 2 s (two leads hashed onto one thread would still queue; the line shows the partitions) | 1 |
    | `flaky-crm` | the flaky CRM never accepts: 3 attempts, `lead.deliver.v1-dlt`, `DELIVERY_FAILED`, `dlt_records_total` +1; the other lead is delivered, replies, the request goes on; the seller page never names the failed lead | 1 |
    | `late-reply` | a lead passes its reply window (the deadline service judged at `reply_due_at + 1 s`), `EXPIRED`; the late reply is accepted, `late=true` in the agent's own view, no late flag on the seller page | 3 |
@@ -32,14 +32,16 @@ it started. The services stay up; `make services-down` stops them. It can be run
 ## make replay
 Run after a demo (the app must be stopped; the script refuses if 8080/8081 are taken). It starts the app in replay
 mode: snapshot `scorecard_fact`, stop the scorecard consumer, truncate, reset group `scorecard` to the earliest
-offsets, consume to the end, compare. Expected: `replay: N facts rebuilt`, `replay: IDENTICAL ...`, exit 0.
+offsets, consume to the end, compare. Expected: `replay: N facts rebuilt`, `replay: IDENTICAL ...`, exit 0. The
+snapshot is taken fresh each time (the old file is deleted first), so it always has the same columns as the table,
+including the late match's `completed_price`, `completed_at` and `price_gap_pct`.
 
 ## Split run
 The same jar as two processes (`application-api.yml`, `application-worker.yml`):
 
 | Process | Profile | Ports | Runs |
 |---|---|---|---|
-| api | `local,demo,api` | 8080 / actuator 8081 | HTTP API, request/reply/evidence/outcome flows, scorecard consumer, simulator |
+| api | `local,demo,api` | 8080 / actuator 8081 | HTTP API, request/reply/evidence/outcome flows, scorecard consumer, late-match scan, simulator |
 | worker | `local,demo,worker` | 8090 / actuator 8091 | `lead.deliver.v1` listener with its retry topics and DLT handler, deadline scanner, outbox relay |
 
 The api still writes its outbox rows in its own transactions; the worker's relay (the only one running) sends them
