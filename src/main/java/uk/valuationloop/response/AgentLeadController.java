@@ -2,11 +2,8 @@ package uk.valuationloop.response;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,7 +24,7 @@ import uk.valuationloop.response.ReplyService.ContactRelease;
  * </pre>
  *
  * 423 Locked (not 403) for the contact: the agent IS allowed to see it, just not yet; 423 says "this resource is
- * locked", and the body says what unlocks it.
+ * locked", and the body says what unlocks it. Error bodies come from {@link uk.valuationloop.api.ApiErrors}.
  */
 @RestController
 @RequestMapping("/agents/{agentId}/leads")
@@ -59,32 +56,5 @@ public class AgentLeadController {
     @GetMapping
     public List<LeadView> myLeads(@PathVariable String agentId) {
         return replies.leadsOf(agentId).stream().map(LeadView::of).toList();
-    }
-
-    // @ExceptionHandler: Spring's version of Django's "raise Http404" mapping, scoped to this controller.
-
-    @ExceptionHandler(ReplyService.LeadNotFound.class)
-    public ResponseEntity<Map<String, String>> notFound(RuntimeException e) {
-        return error(HttpStatus.NOT_FOUND, e);
-    }
-
-    @ExceptionHandler({ReplyService.AlreadyReplied.class, ReplyService.NotReplyable.class,
-            OptimisticLockingFailureException.class})
-    public ResponseEntity<Map<String, String>> conflict(RuntimeException e) {
-        return error(HttpStatus.CONFLICT, e);
-    }
-
-    @ExceptionHandler(ReplyService.InvalidReply.class)
-    public ResponseEntity<Map<String, String>> invalid(RuntimeException e) {
-        return error(HttpStatus.UNPROCESSABLE_ENTITY, e);
-    }
-
-    @ExceptionHandler(ReplyService.ContactLocked.class)
-    public ResponseEntity<Map<String, String>> locked(RuntimeException e) {
-        return error(HttpStatus.LOCKED, e);
-    }
-
-    private static ResponseEntity<Map<String, String>> error(HttpStatus status, RuntimeException e) {
-        return ResponseEntity.status(status).body(Map.of("reason", e.getMessage()));
     }
 }

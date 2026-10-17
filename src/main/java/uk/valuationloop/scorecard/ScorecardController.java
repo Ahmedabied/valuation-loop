@@ -1,11 +1,7 @@
 package uk.valuationloop.scorecard;
 
 import java.util.List;
-import java.util.Map;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,12 +49,7 @@ public class ScorecardController {
         return facts.findAllByOrderByLeadId().stream().map(FactSnapshot::of).toList();
     }
 
-    @ExceptionHandler(UnknownAgent.class)
-    public ResponseEntity<Map<String, String>> notFound(RuntimeException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("reason", e.getMessage()));
-    }
-
-    /** 404 */
+    /** 404 (mapped in {@link uk.valuationloop.api.ApiErrors}). */
     public static class UnknownAgent extends RuntimeException {
         public UnknownAgent(String agentId) { super("no agent " + agentId); }
     }

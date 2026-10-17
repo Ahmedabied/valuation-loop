@@ -3,11 +3,8 @@ package uk.valuationloop.comparison;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.util.Map;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,15 +58,5 @@ public class ComparisonController {
         // a reply landing at the same moment also touches the request row; the loser of that race tries again
         ValuationRequest r = OptimisticLockRetry.run(() -> actions.select(requestId, body.leadId()));
         return new SelectionView(r.getId(), r.getState().name(), r.getSelectedLeadId());
-    }
-
-    @ExceptionHandler(SellerActions.NotFound.class)
-    public ResponseEntity<Map<String, String>> notFound(RuntimeException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("reason", e.getMessage()));
-    }
-
-    @ExceptionHandler({SellerActions.Conflict.class, OptimisticLockingFailureException.class})
-    public ResponseEntity<Map<String, String>> conflict(RuntimeException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("reason", e.getMessage()));
     }
 }

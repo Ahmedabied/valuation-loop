@@ -4,23 +4,20 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
-import java.util.Map;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import uk.valuationloop.delivery.OptimisticLockRetry;
-import uk.valuationloop.lead.LeadTransitions;
 import uk.valuationloop.response.LeadView;
 
 /**
  * <pre>
  * POST /agents/{agentId}/leads/{leadId}/visit  {visitAt?}                    200 lead view | 404 not yours | 409 no reply yet or already booked
  * POST /outcomes/webhook  {leadRef, source, recordedAt}                      202 recorded  | 200 already recorded | 404 unknown leadRef
+ *                         header X-Webhook-Token                             401 missing or wrong (checked first, {@link WebhookTokenCheck})
  * </pre>
  * The webhook answers 200 (not 409) to a repeat on purpose: a CRM that retries should hear "fine, got it", not an
  * error it will keep retrying.
@@ -53,15 +50,5 @@ public class OutcomeController {
         var receipt = OptimisticLockRetry.run(() -> outcomes.recordInstruction(body.leadRef(), body.source(), body.recordedAt()));
         HttpStatus status = receipt == OutcomeService.Receipt.RECORDED ? HttpStatus.ACCEPTED : HttpStatus.OK;
         return ResponseEntity.status(status).body(new WebhookReceipt(body.leadRef(), receipt.name()));
-    }
-
-    @ExceptionHandler(OutcomeService.LeadNotFound.class)
-    public ResponseEntity<Map<String, String>> notFound(RuntimeException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("reason", e.getMessage()));
-    }
-
-    @ExceptionHandler({LeadTransitions.IllegalTransition.class, OptimisticLockingFailureException.class})
-    public ResponseEntity<Map<String, String>> conflict(RuntimeException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("reason", e.getMessage()));
     }
 }
