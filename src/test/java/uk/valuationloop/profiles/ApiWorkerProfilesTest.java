@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import uk.valuationloop.completion.CompletionScanner;
@@ -42,6 +43,7 @@ class ApiWorkerProfilesTest {
     }
 
     @Nested
+    @DirtiesContext   // stop this class's embedded broker when the class ends, not in a JVM shutdown hook
     @SpringBootTest
     @ActiveProfiles({"test", "worker"})
     @EmbeddedKafka(partitions = 1, topics = {Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
@@ -68,6 +70,7 @@ class ApiWorkerProfilesTest {
     }
 
     @Nested
+    @DirtiesContext   // stop this class's embedded broker when the class ends, not in a JVM shutdown hook
     @SpringBootTest
     @ActiveProfiles({"test", "api"})
     @EmbeddedKafka(partitions = 1, topics = {Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
