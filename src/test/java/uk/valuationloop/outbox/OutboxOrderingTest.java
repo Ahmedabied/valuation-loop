@@ -2,7 +2,7 @@ package uk.valuationloop.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -29,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest(properties = // its own in-memory database, never shared with another test context
         "spring.datasource.url=jdbc:h2:mem:outbox_ordering_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
-@EmbeddedKafka(kraft = true, partitions = 1, topics = Topics.LEAD_EVENTS)
+@EmbeddedKafka(partitions = 1, topics = Topics.LEAD_EVENTS)
 class OutboxOrderingTest {
 
     @Autowired OutboxWriter writer;
@@ -44,7 +44,7 @@ class OutboxOrderingTest {
     @BeforeEach
     void setUp() {
         repository.deleteAll();
-        Map<String, Object> props = KafkaTestUtils.consumerProps("outbox-order-" + System.nanoTime(), "false", broker);
+        Map<String, Object> props = KafkaTestUtils.consumerProps(broker, "outbox-order-" + System.nanoTime(), false);
         consumer = new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new StringDeserializer()).createConsumer();
         broker.consumeFromAnEmbeddedTopic(consumer, Topics.LEAD_EVENTS);
     }
@@ -100,7 +100,7 @@ class OutboxOrderingTest {
         while (ids.size() < expected && System.nanoTime() < deadline) {
             for (ConsumerRecord<String, String> r : KafkaTestUtils.getRecords(consumer, Duration.ofMillis(500))) {
                 if (key.equals(r.key())) {
-                    ids.add(objectMapper.readTree(r.value()).path("eventId").asText());
+                    ids.add(objectMapper.readTree(r.value()).path("eventId").asString());
                 }
             }
         }

@@ -1,7 +1,7 @@
 package uk.valuationloop.simulator;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -150,8 +150,8 @@ public class OutboxGapDemo {
             for (ConsumerRecord<?, ?> r : consumer.poll(Duration.ofMillis(500))) {
                 try {
                     JsonNode env = json.readTree(String.valueOf(r.value()));
-                    if (requestId.equals(env.path("requestId").asText())) {
-                        ids.add(env.path("eventId").asText());
+                    if (requestId.equals(env.path("requestId").asString())) {
+                        ids.add(env.path("eventId").asString());
                     }
                 } catch (Exception e) {
                     // not an envelope, so not one of ours

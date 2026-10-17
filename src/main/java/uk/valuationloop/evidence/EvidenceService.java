@@ -1,7 +1,7 @@
 package uk.valuationloop.evidence;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -162,7 +162,7 @@ public class EvidenceService {
     private String toJson(Pack pack) {
         try {
             return json.writeValueAsString(pack);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("pack is not serialisable", e);
         }
     }
@@ -170,7 +170,7 @@ public class EvidenceService {
     private Pack fromJson(String packJson) {
         try {
             return json.readValue(packJson, Pack.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("stored pack_json does not parse", e);
         }
     }

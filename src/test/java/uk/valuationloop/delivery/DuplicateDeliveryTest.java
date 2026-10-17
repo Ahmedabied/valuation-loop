@@ -5,6 +5,8 @@ import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -73,20 +75,35 @@ class DuplicateDeliveryTest extends DeliveryIntegrationTestBase {
                     assertThat(events.poll(r -> hasLeadId(r, lead.getId()))).hasSize(1));
             var delivered = events.poll(r -> hasLeadId(r, lead.getId())).get(0).value();
             EventSchemas.assertValid(delivered);
-            assertThat(readTree(delivered).get("eventType").asText()).isEqualTo(EventTypes.LEAD_DELIVERED);
+            assertThat(readTree(delivered).get("eventType").asString()).isEqualTo(EventTypes.LEAD_DELIVERED);
         }
     }
 
-    /** The "delivery" consumer group's committed offset has reached the end of lead.deliver.v1. */
+    /**
+     * The "delivery" consumer group's committed offset has reached the end of every lead.deliver.v1 partition that
+     * holds records (the lead's key can hash to any of the 6; a partition with no records has nothing to commit).
+     */
     private boolean deliveryGroupHasConsumedEverything() throws Exception {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
         try (AdminClient admin = AdminClient.create(props)) {
-            TopicPartition p0 = new TopicPartition(Topics.LEAD_DELIVER, 0);
-            long end = admin.listOffsets(Map.of(p0, OffsetSpec.latest())).partitionResult(p0).get().offset();
-            OffsetAndMetadata committed = admin.listConsumerGroupOffsets("delivery")
-                    .partitionsToOffsetAndMetadata().get().get(p0);
-            return committed != null && committed.offset() == end;
+            int partitions = admin.describeTopics(List.of(Topics.LEAD_DELIVER)).allTopicNames().get()
+                    .get(Topics.LEAD_DELIVER).partitions().size();
+            Map<TopicPartition, OffsetSpec> latest = new HashMap<>();
+            for (int i = 0; i < partitions; i++) {
+                latest.put(new TopicPartition(Topics.LEAD_DELIVER, i), OffsetSpec.latest());
+            }
+            var ends = admin.listOffsets(latest).all().get();
+            Map<TopicPartition, OffsetAndMetadata> committed = admin.listConsumerGroupOffsets("delivery")
+                    .partitionsToOffsetAndMetadata().get();
+            for (var end : ends.entrySet()) {
+                OffsetAndMetadata c = committed.get(end.getKey());
+                long done = c == null ? 0 : c.offset();
+                if (done != end.getValue().offset()) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 }
