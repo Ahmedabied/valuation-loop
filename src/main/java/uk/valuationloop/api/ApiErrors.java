@@ -119,6 +119,19 @@ public class ApiErrors {
     }
 
     private static ResponseEntity<ApiError> body(HttpStatusCode status, String code, String message) {
-        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(new ApiError(code, message));
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(new ApiError(code, safe(message)));
+    }
+
+    /**
+     * Messages may name an id the caller sent in the path or body ("no request vr_..."), and nothing validated that
+     * id. So every message is cut to 200 characters and any character outside a plain set (letters, digits, space and
+     * . , : ; ' ( ) / + = _ -) becomes '?': a caller can never get markup or control characters echoed back.
+     */
+    static String safe(String message) {
+        if (message == null) {
+            return null;
+        }
+        String cut = message.length() > 200 ? message.substring(0, 200) : message;
+        return cut.replaceAll("[^A-Za-z0-9 .,:;'()/+=_-]", "?");
     }
 }
