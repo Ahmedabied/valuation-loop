@@ -2,6 +2,7 @@ package uk.valuationloop.simulator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,13 +54,21 @@ class SimulatorScenarioTest {
         }
 
         /**
-         * Land Registry, faked: one later sale at whatever postcode is asked, 45 days after the earliest date the rule
-         * allows (so 15 days after the instruction), so the late match finds it.
+         * The real sale the ok request is taken from, faked: one fictional SW11 flat sold 60 days ago (Price Paid lags
+         * about two months), inside the demo profile's 400-day lookback (application-demo.yml).
          */
+        static final ComparableDocument SEED = new ComparableDocument("ppd-sim-seed", 612_000,
+                LocalDate.now().minusDays(60).toString(), "SW11 9ZZ", "SW11", FakeEvidenceSources.ORIGIN,
+                "FLAT", null, false, "L", 71.0, null, null, null, "WANDSWORTH", "ppd-test");
+
+        @Bean @Primary RecentSales fakeRecentSales() {
+            return (outcode, type, max) -> List.of(SEED);
+        }
+
+        /** Land Registry, faked: the seed sale, whenever the rule's window and key admit it (so a self-match). */
         @Bean @Primary CompletedSales fakeCompletedSales() {
-            return (postcode, type, onOrAfter) -> List.of(new ComparableDocument("ppd-sim-completion", 612_000,
-                    onOrAfter.plusDays(45).toString(), postcode, postcode.split(" ")[0], FakeEvidenceSources.ORIGIN,
-                    type, null, false, "L", null, null, null, null, "WANDSWORTH", "ppd-test"));
+            return (postcode, type, onOrAfter) -> postcode.equals(SEED.postcode()) && type.equals(SEED.propertyType())
+                    && !LocalDate.parse(SEED.dateOfTransfer()).isBefore(onOrAfter) ? List.of(SEED) : List.of();
         }
 
         /** Every postcode resolves (the real centroid index is in Elasticsearch). */
@@ -100,7 +109,8 @@ class SimulatorScenarioTest {
         assertThat(fact.get("priceGapPct")).isNotNull();
         assertThat(report.checks().get("Land Registry late match").toString())
                 .startsWith("completed=true, priceGapPct=" + fact.get("priceGapPct"))
-                .contains("ppd-sim-completion").contains("demo: self-match possible");
+                .contains("(demo: self-match, see completion/package-info; ppd-sim-seed, GBP 612000");
+        assertThat(report.checks().get("request property (a real PPD sale)").toString()).startsWith("SW11 9ZZ, FLAT, 71.0 m2");
         assertThat(report.selectedAgentScorecard().completed()).isEqualTo(1);
         assertThat(report.selectedAgentScorecard().medianPriceGapPct()).isNotNull();
 
