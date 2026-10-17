@@ -114,6 +114,7 @@ make stats           # print the range-width statistic above
 make run             # the app on 127.0.0.1:8080 (actuator on 127.0.0.1:8081), profiles local,demo (demo adds the simulator and internal routes)
 make demo            # starts the app from the jar, runs every scenario, prints the report, stops the app (not with make run up)
 make replay          # after make demo, app stopped: truncate scorecard_fact, reset offsets, rebuild, compare, exit 0/1
+make demo-reset      # clean numbers: stop app, Kafka, Postgres; delete ~/tools/kafka-data, ~/tools/pgdata, the snapshot
 make demo-split      # the same jar as two processes: api on 8080 (actuator 8081), worker on 8090 (actuator 8091)
 make run-split       # api + worker in the background (or make run-api / make run-worker); scripts/split.sh stop
 make page ID=<id>    # print the URL of the seller's side-by-side page for a request (the app must be running)
@@ -124,6 +125,12 @@ make services-down
 of this Gradle version, so not while another session on the box is building). `make demo` and `make replay` start the
 app themselves on 8080/8081 and refuse if `make run` holds those ports; they wait (up to 3 minutes) while less than
 2.5 GB of RAM is free. A Gradle daemon kept from `make test` holds about 1 GB; stop it first on a tight box.
+
+Clean numbers: run `make demo-reset` before a demo you will show someone; the database otherwise accumulates every
+run. It stops the demo app, Kafka and Postgres, deletes `~/tools/kafka-data`, `~/tools/pgdata` and
+`~/tools/logs/scorecard-snapshot.json`, and keeps the Elasticsearch data and `~/tools/pg.pw`; the next `make demo`
+runs initdb, Flyway V1-V5 and `kafka-storage format --standalone` again. It refuses (exit 1, nothing deleted) if
+Kafka or Postgres is still running on those directories after the stop.
 
 Checked again on Spring Boot 4.1.1 on 2026-10-17 (second review), services stopped at the start: `make test` three
 times (149 tests, 2 skipped, each run forced), `make services-up`, `make demo` twice (ok scenario `completed=true` as

@@ -14,7 +14,7 @@ PG_PORT    ?= 5433
 PG_DB      ?= valuation_loop
 LOGS       := $(HOME)/tools/logs
 
-.PHONY: help test test-es build jar run kafka-up kafka-down es-up es-down pg-up pg-down services-up services-down status load stats demo replay clean-daemons page
+.PHONY: help test test-es build jar run kafka-up kafka-down es-up es-down pg-up pg-down services-up services-down status load stats demo demo-reset replay clean-daemons page
 
 # pgrep/pkill -f match the full command line, and the shell make starts for a recipe has the pattern in ITS command
 # line too, so a plain pattern always finds that shell. "[k]afka" matches the text "kafka" but not the text "[k]afka".
@@ -119,6 +119,11 @@ stats:                   # the comparables-range width statistic (the README's n
 # stopped again; the services stay up. Details: scripts/demo.sh and docs/DEMO.md.
 demo: services-up jar
 	@LOGS=$(LOGS) APP_JAR=$(APP_JAR) PG_PWFILE=$(PG_PWFILE) scripts/demo.sh
+
+# clean numbers: stop the demo app, Kafka and Postgres, delete $(KAFKA_DATA), $(PG_DATA) and the replay snapshot
+# (not the Elasticsearch data, not $(PG_PWFILE)); the next make demo re-initialises both. scripts/demo-reset.sh
+demo-reset:
+	@LOGS=$(LOGS) PG_PWFILE=$(PG_PWFILE) KAFKA_DATA=$(KAFKA_DATA) PG_DATA=$(PG_DATA) scripts/demo-reset.sh
 
 # rebuild scorecard_fact from the topics (ScorecardReplay): snapshot, truncate, reset offsets, replay, compare, exit
 replay: services-up jar
