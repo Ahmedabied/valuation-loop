@@ -148,7 +148,8 @@ in order. `DeliverLead` is keyed by `leadId` so that, with several partitions an
 different agents spread out. A failed delivery never holds up the leads behind it: it waits for its retry on a retry
 topic. A slow one does, in v1: the adapter call blocks the listener thread, and the local topic has one partition and
 one consumer thread, so the demo's `slow` scenario shows an `ok` lead queued behind a 2 s CRM. Production needs more
-partitions, listener concurrency and a per-CRM timeout (a bulkhead), not a different key.
+partitions, listener concurrency and a per-CRM timeout (a bulkhead), not a different key. [Phase 2 added exactly
+that: 6 partitions, 3 threads, a 5 s timeout; see §21.]
 
 ## 7. The outbox
 
@@ -244,7 +245,7 @@ selection is a 409.
 is the simulated CRM push: it carries `leadRef`, the portal's lead id echoed back, as real CRM integrations do. So
 attribution is a primary-key lookup, not an address match. The webhook is idempotent on the lead's own
 `instructed_at`: a repeat returns 200 and writes nothing, because a CRM that retries should hear "got it", not an
-error. The address-based Land Registry late match for completions is v2.
+error. The address-based Land Registry late match for completions is v2 [phase 2 built a postcode-based version; §21].
 
 ## 12. Scorecard and replay
 
@@ -367,3 +368,18 @@ imports (Jackson 3 moves to `tools.jackson`), spring-kafka 4.x and the Elasticse
 4. A static side-by-side page for the seller view.
 5. CI with Testcontainers.
 6. Optional EBM sidecar for the comparables range with an error estimate.
+
+Items 2-4 and CI (without Testcontainers) were built on 2026-10-17; §21 says how. Left: 1, Testcontainers, 6.
+
+## 21. Phase 2 additions
+
+- **Slow CRMs.** `lead.deliver.v1` and its retry/DLT topics have 6 partitions, 3 listener threads, and a 5 s deadline
+  per adapter call (`AdapterCaller` interrupts the call's virtual thread); a timeout is a failed attempt like any other.
+- **api + worker from one jar**, by profile (`make demo-split`): the worker runs delivery, the DLT handler, the deadline
+  scanner and the only outbox relay. Profiles, not two Gradle modules: the seam is already Kafka plus one Postgres, so
+  one artefact, schema and test suite; `ApiWorkerProfilesTest` pins the wiring.
+- **Late match.** An instructed lead joins the Price Paid sale at its postcode and type transferred on or after
+  (instruction - 30 days). Postcode is not an address (production: UPRN). The demo asks about a flat already sold and
+  widens the window to 400 days, so its match is that same sale: a self-match that shows the join, not a discovery.
+- **Product query** adds `completed` and the median price gap (completed price vs range midpoint), highest vs other.
+- **CI.** GitHub Actions: tests on H2 + embedded Kafka, then the live-Elasticsearch tests on a service container.
