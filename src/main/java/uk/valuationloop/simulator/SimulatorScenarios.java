@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,10 +26,13 @@ import uk.valuationloop.comparison.SellerActions;
 import uk.valuationloop.comparison.SellerActions.EngagementAction;
 import uk.valuationloop.completion.CompletionMatch;
 import uk.valuationloop.completion.CompletionMatchRepository;
+import uk.valuationloop.completion.CompletedSales;
 import uk.valuationloop.completion.CompletionScanner;
+import uk.valuationloop.completion.MatchRule;
 import uk.valuationloop.delivery.DeadlineService;
 import uk.valuationloop.delivery.OptimisticLockRetry;
 import uk.valuationloop.evidence.Comparable;
+import uk.valuationloop.evidence.ComparableDocument;
 import uk.valuationloop.evidence.ComparablesRange;
 import uk.valuationloop.evidence.EvidenceService;
 import uk.valuationloop.evidence.EvidenceService.AgentPackView;
@@ -74,6 +78,9 @@ public class SimulatorScenarios {
     private static final Duration WAIT = Duration.ofSeconds(30);
     private static final Duration POLL = Duration.ofMillis(100);
     private static final BigDecimal FLOOR_AREA_M2 = new BigDecimal("68.5");
+    /** The ok scenario's request is the most recent real flat sale here (see okProperty). */
+    static final String OK_OUTCODE = "SW11";
+    private static final int OK_CANDIDATES = 20;
 
     private final ValuationRequestService requestService;
     private final ValuationRequestRepository requests;
@@ -92,6 +99,8 @@ public class SimulatorScenarios {
     private final KafkaListenerEndpointRegistry listeners;
     private final CompletionScanner completions;
     private final CompletionMatchRepository completionMatches;
+    private final RecentSales recentSales;
+    private final CompletedSales completedSales;
     private final String postcode;
 
     public SimulatorScenarios(ValuationRequestService requestService, ValuationRequestRepository requests,
@@ -100,7 +109,8 @@ public class SimulatorScenarios {
                               OutcomeService outcomes, DeadlineService deadlines, DeliveryControl delivery,
                               ScorecardFactRepository facts, ObjectMapper json, Clock clock,
                               KafkaListenerEndpointRegistry listeners, CompletionScanner completions,
-                              CompletionMatchRepository completionMatches,
+                              CompletionMatchRepository completionMatches, RecentSales recentSales,
+                              CompletedSales completedSales,
                               @Value("${valuationloop.simulator.postcode:SW11 1AA}") String postcode) {
         this.requestService = requestService;
         this.requests = requests;
@@ -119,6 +129,8 @@ public class SimulatorScenarios {
         this.listeners = listeners;
         this.completions = completions;
         this.completionMatches = completionMatches;
+        this.recentSales = recentSales;
+        this.completedSales = completedSales;
         this.postcode = postcode;
     }
 
@@ -153,7 +165,8 @@ public class SimulatorScenarios {
                                     String plainAgent) {
         long started = System.nanoTime();
         Map<String, Object> checks = new LinkedHashMap<>();
-        String requestId = createRequest(scenario, List.of(highAgent, evidencedAgent, plainAgent));
+        Property property = scenario.equals("ok") ? okProperty(checks) : new Property(postcode, FLOOR_AREA_M2, null);
+        String requestId = createRequest(scenario, List.of(highAgent, evidencedAgent, plainAgent), property);
 
         List<AgentLead> delivered = awaitLeads(requestId, "every lead DELIVERED",
                 ls -> ls.stream().allMatch(l -> l.getState() == LeadState.DELIVERED));
@@ -169,7 +182,7 @@ public class SimulatorScenarios {
         AgentPackView built = evidence.build(evidencedAgent, evidencedLead);
         List<Comparable> comps = built.pack().comparables();
         if (comps.size() <= ComparablesRange.MINIMUM_COMPARABLES) {
-            throw new ScenarioFailed(scenario + ": the pack for " + postcode + " has only " + comps.size()
+            throw new ScenarioFailed(scenario + ": the pack for " + property.postcode() + " has only " + comps.size()
                     + " comparables; is the comparables index loaded (make load)?");
         }
         String dropped = comps.get(comps.size() - 1).ppdTransactionId();   // the lowest-ranked one
@@ -202,7 +215,7 @@ public class SimulatorScenarios {
         ScorecardFact fact = awaitFact(evidencedLead, "the scorecard fact shows the instruction",
                 f -> f.isInstructed() && f.isSellerSelected() && f.isVisitBooked() && f.isEvidenceAttached());
         if (scenario.equals("ok")) {
-            fact = completionStep(evidencedLead, fact, checks);
+            fact = completionStep(evidencedLead, property, fact, checks);
         }
         checks.put("scorecard fact of the selected lead", factExcerpt(fact));
         return report(scenario, proves, requestId, checks, evidencedAgent, started);
@@ -295,35 +308,74 @@ public class SimulatorScenarios {
     }
 
     /**
-     * The v2 late match: one scan now, then, if the instructed lead got a completion, wait for the scorecard to join it.
-     * The demo keys on postcode + property type + date only, and the request's postcode comes from a real PPD sale, so
-     * against the real index the match can be that sale itself; the report line says so rather than imply a discovery.
-     * No match is a normal outcome (Land Registry publishes weeks after a completion), reported as completed=false.
+     * The ok scenario's property, taken from a real sale so the late match has something to find: among the
+     * 20 most recent FLAT sales in SW11 with a floor area, the newest one that the
+     * match rule, run today, would pick for itself (the rule takes the EARLIEST qualifying sale at a postcode, so a
+     * postcode with an older flat sale inside the lookback window would match that one instead). If none qualifies,
+     * the newest sale is used and the report says what it matched. Logged: a PPD postcode (OGL), never an EPC field.
      */
-    private ScorecardFact completionStep(String leadId, ScorecardFact fact, Map<String, Object> checks) {
+    private Property okProperty(Map<String, Object> checks) {
+        List<ComparableDocument> recent = recentSales.latestWithFloorArea(OK_OUTCODE, PropertyType.FLAT.name(), OK_CANDIDATES);
+        if (recent.isEmpty()) {
+            throw new ScenarioFailed("ok: no " + PropertyType.FLAT + " sale with a floor area in " + OK_OUTCODE
+                    + " in the comparables index; is it loaded (make load)?");
+        }
+        MatchRule rule = completions.rule();
+        Instant now = clock.instant();
+        LocalDate earliest = rule.earliestTransfer(now);
+        ComparableDocument sale = recent.stream()
+                .filter(s -> rule.pick(s.postcode(), s.propertyType(), now, completedSales.find(s.postcode(), s.propertyType(), earliest))
+                        .map(ComparableDocument::ppdTransactionId).filter(s.ppdTransactionId()::equals).isPresent())
+                .findFirst().orElse(recent.get(0));
+        log.info("scenario ok: the request is the real sale {} ({} {} {} m2, sold {})", sale.ppdTransactionId(),
+                sale.postcode(), sale.propertyType(), sale.floorAreaM2(), sale.dateOfTransfer());
+        checks.put("request property (a real PPD sale)", sale.postcode() + ", " + sale.propertyType() + ", "
+                + sale.floorAreaM2() + " m2 (" + sale.ppdTransactionId() + ", sold " + sale.dateOfTransfer() + ")");
+        return new Property(sale.postcode(), BigDecimal.valueOf(sale.floorAreaM2()), sale.ppdTransactionId());
+    }
+
+    /**
+     * The v2 late match: one scan now, then, if the instructed lead got a completion, wait for the scorecard to join it.
+     * The demo keys on postcode + property type + date only, and the ok request is itself a real PPD sale (okProperty),
+     * so against the real index the match is normally that sale itself; the report line says so rather than imply a
+     * discovery. No match is a normal outcome (Land Registry publishes weeks after a completion), reported as
+     * completed=false.
+     */
+    private ScorecardFact completionStep(String leadId, Property property, ScorecardFact fact, Map<String, Object> checks) {
         var scan = completions.scanOnce();
         CompletionMatch match = completionMatches.findById(leadId).orElse(null);
         if (match == null) {
-            checks.put("Land Registry late match", "completed=false (no " + PropertyType.FLAT + " sale at " + postcode
+            checks.put("Land Registry late match", "completed=false (no " + PropertyType.FLAT + " sale at " + property.postcode()
                     + " transferred on or after " + completions.rule().earliestTransfer(leadOfId(leadId).getInstructedAt())
                     + " in the index; scanned " + scan.scanned() + " instructed lead(s))");
             return fact;
         }
         ScorecardFact joined = awaitFact(leadId, "the scorecard fact shows the completion",
                 f -> f.getCompletedPrice() != null && f.getPriceGapPct() != null);
+        String kind = match.getPpdTransactionId().equals(property.saleId())
+                ? "demo: self-match, see completion/package-info"
+                : "demo: another sale at the same postcode, keyed on postcode+type+date, see completion/package-info";
         checks.put("Land Registry late match", "completed=true, priceGapPct=" + joined.getPriceGapPct().toPlainString()
-                + " (" + match.getPpdTransactionId() + ", " + "GBP " + match.getCompletedPrice().toPlainString() + " on "
-                + match.getCompletedAt() + "; demo: self-match possible, keyed on postcode+type+date, not the address)");
+                + " (" + kind + "; " + match.getPpdTransactionId() + ", GBP " + match.getCompletedPrice().toPlainString()
+                + " on " + match.getCompletedAt() + ")");
         return joined;
+    }
+
+    /** What a scenario's request asks about. saleId: the PPD sale it was taken from (ok scenario), else null. */
+    private record Property(String postcode, BigDecimal floorAreaM2, String saleId) {
     }
 
     // ---------- steps ----------
 
     private String createRequest(String scenario, List<String> agentIds) {
+        return createRequest(scenario, agentIds, new Property(postcode, FLOOR_AREA_M2, null));
+    }
+
+    private String createRequest(String scenario, List<String> agentIds, Property property) {
         log.info("scenario {}: seller asks {} for a valuation", scenario, agentIds);
         var created = requestService.create(new ValuationRequestService.CreateCommand(
-                "sim-" + scenario + "-" + Long.toString(System.currentTimeMillis(), 36), postcode, PropertyType.FLAT,
-                2, FLOOR_AREA_M2, agentIds));
+                "sim-" + scenario + "-" + Long.toString(System.currentTimeMillis(), 36), property.postcode(),
+                PropertyType.FLAT, 2, property.floorAreaM2(), agentIds));
         return created.request().getId();
     }
 
