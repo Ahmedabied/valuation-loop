@@ -57,7 +57,11 @@ class EventSchemasTest {
                 Arguments.of(EventTypes.SELLER_SELECTED, LEAD, AGENT, Map.of()),
                 Arguments.of(EventTypes.VISIT_BOOKED, LEAD, AGENT, withNulls(Map.of(), "visitAt")),
                 Arguments.of(EventTypes.INSTRUCTION_RECORDED, LEAD, AGENT, Map.of(
-                        "leadRef", LEAD, "source", "crm-webhook", "recordedAt", "2026-10-20T14:30:00Z")));
+                        "leadRef", LEAD, "source", "crm-webhook", "recordedAt", "2026-10-20T14:30:00Z")),
+                Arguments.of(EventTypes.COMPLETION_MATCHED, LEAD, AGENT, Map.of(
+                        "ppdTransactionId", "{3F1A2B4C-0000-4000-8000-000000000001}", "completedPrice", 612000,
+                        "completedAt", "2026-12-04",
+                        "matchRule", "postcode+propertyType+dateOfTransfer>=instructedAt-30d")));
     }
 
     @ParameterizedTest(name = "{0}")

@@ -22,6 +22,7 @@ Tests check emitted events with `EventSchemas.assertValid(json)` (`src/test/java
 | SellerSelected | `lead.events.v1` | requestId | comparison | scorecard | none (the envelope's leadId is the choice) |
 | VisitBooked | `lead.events.v1` | requestId | outcome | scorecard | visitAt (nullable) |
 | InstructionRecorded | `outcome.recorded.v1` | requestId | outcome | scorecard | leadRef (the leadId the CRM echoes back), source, recordedAt |
+| CompletionMatched | `outcome.recorded.v1` | requestId | completion | scorecard | ppdTransactionId, completedPrice, completedAt (date), matchRule (the v2 Land Registry late match; private outcome fact, never on the seller page) |
 
 ## Retry topics
 `@RetryableTopic` makes 3 attempts per lead: attempt 1 on `lead.deliver.v1`, attempt 2 on `lead.deliver.v1-retry-0`,
