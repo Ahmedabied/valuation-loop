@@ -252,8 +252,7 @@ error. The address-based Land Registry late match for completions is v2.
 `ScorecardProjector` upserts `scorecard_fact` by `lead_id` with: delivered and replied times, reply minutes,
 within the reply window or not, evidence attached, the reply's range rank among that request's replies (highest,
 middle or lowest by midpoint, null until there are two replies), seller engaged, seller selected, visit booked,
-instructed. Because the upsert is by natural key, no dedupe table is needed. (`processed_event` exists in V1 for a
-future consumer whose side effect is not an upsert; no v1 consumer uses it.)
+instructed. Because the upsert is by natural key, no dedupe table is needed.
 
 `GET /agents/{id}/scorecard` returns that agent's own numbers next to a static value labelled "fixture benchmark".
 It never returns another agent's id or numbers and never a position in a list.
