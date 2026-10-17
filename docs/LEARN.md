@@ -182,8 +182,8 @@ perfect match. Put the weight back and `NO-AREA` is always second.
   (`request = requests.save(request)`). Inside a transaction a loaded entity is managed and written at commit without
   any `save` (dirty checking).
 - **`@KafkaListener` with ack-mode record.** The method is called once per record; when it returns without throwing,
-  the container commits that record's offset. If it throws, the offset is not committed and the error handler (here,
-  the retry topics) decides what happens. Committing after the database commit is what makes a crash safe.
+  the container commits that record's offset. If it throws, the offset is not committed and the error handler decides
+  what happens (delivery: the retry topics and the DLT; scorecard: in-place retries, then skip and count). Committing after the database commit is what makes a crash safe.
 - **`@RetryableTopic`.** Declares N attempts, backoff and a DLT on the listener; spring-kafka creates the retry topics
   and their listeners. A failed record is re-published to the next topic with a delay header, so the main partition
   keeps moving. `@DltHandler` is the method for the last stop.
