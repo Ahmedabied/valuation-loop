@@ -5,6 +5,8 @@
  * HTTP API: the services are exactly what the controllers call, the report can read the lead rows between steps, and
  * the test can run it without a web port. The Kafka hops stay real: the outbox relay, the delivery consumer (with its
  * retry topics and DLT) and the scorecard consumer all run, and every wait in a scenario is a wait for them.
+ * The "ok" scenario ends with one Land Registry late-match scan (completion module) and reports completed=true with the
+ * price gap, or completed=false when the index holds no qualifying sale yet.
  * POST /simulator/outbox-gap pauses the relay to show the gap between commit and send (the "kill" demo, no kill).
  */
 package uk.valuationloop.simulator;

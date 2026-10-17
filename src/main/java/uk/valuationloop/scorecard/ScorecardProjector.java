@@ -3,6 +3,7 @@ package uk.valuationloop.scorecard;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,8 @@ public class ScorecardProjector {
     static final Set<String> HANDLED = Set.of(
             EventTypes.LEAD_DELIVERED, EventTypes.LEAD_DELIVERY_FAILED, EventTypes.LEAD_REPLIED,
             EventTypes.EVIDENCE_ATTACHED, EventTypes.LEAD_EXPIRED, EventTypes.SELLER_ENGAGED,
-            EventTypes.SELLER_SELECTED, EventTypes.VISIT_BOOKED, EventTypes.INSTRUCTION_RECORDED);
+            EventTypes.SELLER_SELECTED, EventTypes.VISIT_BOOKED, EventTypes.INSTRUCTION_RECORDED,
+            EventTypes.COMPLETION_MATCHED);
 
     private final ScorecardFactRepository facts;
     private final Clock clock;
@@ -77,6 +79,9 @@ public class ScorecardProjector {
             case EventTypes.SELLER_SELECTED -> fact.sellerSelected();
             case EventTypes.VISIT_BOOKED -> fact.visitBooked();
             case EventTypes.INSTRUCTION_RECORDED -> fact.instructed();
+            // the gap to the range midpoint is derived in touched(), so it appears whether the reply came first or not
+            case EventTypes.COMPLETION_MATCHED ->
+                    fact.completed(decimal(p.get("completedPrice")), LocalDate.parse(p.get("completedAt").toString()));
             default -> throw new IllegalStateException("unreachable: " + e.eventType());
         }
         fact.touched(occurredAt, clock.instant());
