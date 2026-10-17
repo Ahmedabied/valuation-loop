@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import uk.valuationloop.delivery.CrmAdapter.LeadPush;
 import uk.valuationloop.delivery.DeliveryTransactions.Begin;
+import uk.valuationloop.request.RequestCloser;
 
 /**
  * Delivers one lead: begin the attempt (commit), call the adapter (no transaction open), record the result (commit).
@@ -24,10 +25,12 @@ public class LeadDeliveryService {
 
     private final DeliveryTransactions tx;
     private final AdapterRegistry adapters;
+    private final RequestCloser closer;
 
-    public LeadDeliveryService(DeliveryTransactions tx, AdapterRegistry adapters) {
+    public LeadDeliveryService(DeliveryTransactions tx, AdapterRegistry adapters, RequestCloser closer) {
         this.tx = tx;
         this.adapters = adapters;
+        this.closer = closer;
     }
 
     public void deliver(DeliverLead cmd) {
@@ -44,11 +47,19 @@ public class LeadDeliveryService {
         }
     }
 
-    /** Called once the record reached the DLT: the lead stops being retried and is marked DELIVERY_FAILED. */
+    /**
+     * Called once the record reached the DLT: the lead stops being retried and is marked DELIVERY_FAILED. Then the
+     * same closure rule the deadline scanner applies: if that was the request's last open lead and nobody replied,
+     * the request closes (ALL_LEADS_TERMINAL). Without this, a request whose every CRM failed would never close,
+     * because the scanner only looks at requests that had a lead expire. A separate transaction, after the first.
+     */
     public void giveUp(DeliverLead cmd, String reason) {
         boolean marked = OptimisticLockRetry.run(() -> tx.recordFailed(cmd, reason));
         if (marked) {
             log.warn("lead {} marked DELIVERY_FAILED: {}", cmd.leadId(), reason);
+            if (OptimisticLockRetry.run(() -> closer.closeIfAllLeadsTerminal(cmd.requestId(), RequestCloser.ALL_LEADS_TERMINAL))) {
+                log.info("request {} closed: every lead is terminal and none replied", cmd.requestId());
+            }
         }
     }
 }

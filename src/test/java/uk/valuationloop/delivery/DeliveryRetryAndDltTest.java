@@ -15,6 +15,8 @@ import uk.valuationloop.lead.AgentLead;
 import uk.valuationloop.lead.LeadState;
 import uk.valuationloop.outbox.EventTypes;
 import uk.valuationloop.outbox.Topics;
+import uk.valuationloop.request.RequestState;
+import uk.valuationloop.request.ValuationRequestRepository;
 import uk.valuationloop.support.EventSchemas;
 
 /**
@@ -31,6 +33,7 @@ class DeliveryRetryAndDltTest extends DeliveryIntegrationTestBase {
     static final String FLAKY_AGENT = "ag_fictional_03";
 
     @Autowired KafkaListenerEndpointRegistry listeners;
+    @Autowired ValuationRequestRepository requests;
 
     @Test
     void springKafkaCreatedTheRetryAndDltTopicsWithTheseNames() {
@@ -44,6 +47,19 @@ class DeliveryRetryAndDltTest extends DeliveryIntegrationTestBase {
         }
         assertThat(topics).contains(Topics.LEAD_DELIVER, RETRY_0, RETRY_1, DLT);
         assertThat(topics).filteredOn(t -> t.startsWith(Topics.LEAD_DELIVER)).hasSize(4); // 2 retries for 3 attempts
+    }
+
+    @Test
+    void aRequestWhoseOnlyLeadFailsDeliveryCloses() throws Exception {
+        // the seller picked only the flaky agent: once its lead is DELIVERY_FAILED nothing can come back to the seller
+        String requestId = postRequest("seller-dlt-only", "SW11 4DD", List.of(FLAKY_AGENT));
+        await().atMost(AWAIT).untilAsserted(() ->
+                assertThat(requests.findById(requestId).orElseThrow().getState()).isEqualTo(RequestState.CLOSED));
+        assertThat(leadOf(requestId, FLAKY_AGENT).getState()).isEqualTo(LeadState.DELIVERY_FAILED);
+        List<String> closed = outboxEventsForRequest(EventTypes.REQUEST_CLOSED, requestId);
+        assertThat(closed).hasSize(1);
+        EventSchemas.assertValid(closed.get(0));
+        assertThat(readTree(closed.get(0)).at("/payload/reason").asText()).isEqualTo("ALL_LEADS_TERMINAL");
     }
 
     @Test
