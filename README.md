@@ -1,5 +1,10 @@
 # Valuation Loop
 
+> "By joining our team, you'll help homeowners pick the right agent for them and help agents get better at what they
+> do." (Rightmove, Agent Select vacancy)
+
+This is my attempt at that problem, to see whether I read it right.
+
 I built the backend for Rightmove's choose-an-agent moment: a valuation lead that reaches each agent reliably, comes
 back with evidence the agent chose to attach, records what the homeowner did with it and whether it became a visit
 and an instruction, and gives the agent a private view of their own numbers, in Rightmove's stack (Java 21, Spring
