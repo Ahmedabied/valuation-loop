@@ -162,7 +162,7 @@ public final class EpcLookup {
         }
         return new EpcAttributes(
                 positiveDouble(f.get(col.get("TOTAL_FLOOR_AREA"))),
-                band(f.get(col.get("CURRENT_ENERGY_RATING"))),
+                energyRating(f.get(col.get("CURRENT_ENERGY_RATING"))),
                 cleanBuiltForm(f.get(col.get("BUILT_FORM"))),
                 cleanAgeBand(f.get(col.get("CONSTRUCTION_AGE_BAND"))),
                 positiveInt(f.get(col.get("NUMBER_HABITABLE_ROOMS"))),
@@ -188,7 +188,7 @@ public final class EpcLookup {
         }
     }
 
-    private static String band(String s) {
+    private static String energyRating(String s) {
         String t = s.trim().toUpperCase();
         return t.length() == 1 && t.charAt(0) >= 'A' && t.charAt(0) <= 'G' ? t : null;
     }

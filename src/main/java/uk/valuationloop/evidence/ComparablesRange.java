@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * "The range implied by the comparables this agent attached": lower quartile, median and upper quartile of the
- * attached comparables' sale prices, rounded to whole pounds. Never called a band, never a valuation.
+ * attached comparables' sale prices, rounded to whole pounds. It describes the evidence; it is not a valuation.
  *
  * Quartile method: linear interpolation between order statistics at position p * (n - 1) of the sorted prices
  * (the "inclusive" method; numpy.percentile's default and Excel's QUARTILE.INC). With fewer than 3 comparables
