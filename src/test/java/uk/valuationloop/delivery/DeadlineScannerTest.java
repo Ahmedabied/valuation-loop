@@ -18,7 +18,10 @@ import uk.valuationloop.request.RequestState;
 import uk.valuationloop.request.ValuationRequestRepository;
 import uk.valuationloop.support.EventSchemas;
 
-/** Reply window closes -> LeadExpired; every lead terminal -> RequestClosed; a late reply is still accepted. */
+/**
+ * Reply window closes -> LeadExpired; every lead terminal and none replied -> RequestClosed; a late reply is still
+ * accepted. A request with a reply stays REPLIES_IN when the other leads expire: the seller's selection closes it.
+ */
 class DeadlineScannerTest extends DeliveryIntegrationTestBase {
 
     @Autowired DeadlineScanner scanner;
@@ -68,5 +71,24 @@ class DeadlineScannerTest extends DeliveryIntegrationTestBase {
         EventSchemas.assertValid(replied.get(0).toString());
         assertThat(replied.get(0).at("/payload/late").asBoolean()).isTrue();
         assertThat(requests.findById(requestId).orElseThrow().getState()).isEqualTo(RequestState.CLOSED);
+    }
+
+    @Test
+    void aRequestWithAReplyStaysOpenWhenTheOtherLeadsExpire() throws Exception {
+        String requestId = postRequest("seller-deadline-2", "SW11 3CD", List.of("ag_fictional_01", "ag_fictional_05"));
+        awaitAllLeads(requestId, LeadState.DELIVERED);
+
+        String replied = leadOf(requestId, "ag_fictional_01").getId();
+        mvc.perform(post("/agents/ag_fictional_01/leads/" + replied + "/reply").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"low\": 610000, \"high\": 650000}"))
+                .andExpect(status().isCreated());
+
+        clock.advance(Duration.ofHours(25));
+        scanner.scanOnce();
+
+        assertThat(leadOf(requestId, "ag_fictional_05").getState()).isEqualTo(LeadState.EXPIRED);
+        assertThat(leadOf(requestId, "ag_fictional_01").getState()).isEqualTo(LeadState.REPLIED);
+        assertThat(requests.findById(requestId).orElseThrow().getState()).isEqualTo(RequestState.REPLIES_IN);
+        assertThat(outboxEventsForRequest(EventTypes.REQUEST_CLOSED, requestId)).isEmpty();
     }
 }
