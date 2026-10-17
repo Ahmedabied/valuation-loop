@@ -79,6 +79,8 @@ public class EventTracing {
         }
     }
 
+    // try (SpanInScope ...) is Python's "with": the scope is never used by name, only opened and closed around the
+    // work, so the span is current on this thread for exactly that block (javac -Xlint:try notes the unused name)
     private static <T> T runInSpan(Span span, Supplier<T> work) {
         try (Tracer.SpanInScope scope = tracer.withSpan(span)) {
             return work.get();
