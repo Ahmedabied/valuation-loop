@@ -1,0 +1,13 @@
+.gradle/
+build/
+out/
+*.log
+.idea/
+*.iml
+.vscode/
+.env
+# data and secrets never enter the repo (see ARCHITECTURE.md §10)
+data/
+*.zip
+*.csv
+.token
