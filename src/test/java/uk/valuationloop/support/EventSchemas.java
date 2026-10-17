@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
  * its eventType, from src/main/resources/events/&lt;EventType&gt;.schema.json.
  *
  * Use it in any test that sees an emitted event: {@code EventSchemas.assertValid(record.value());}
+ * The validator library (networknt) is built on Jackson 2, so this helper parses the wire string with its own
+ * Jackson 2 mapper; the string itself is what the app (Jackson 3) wrote.
  * A failure lists every violation, so a contract break reads as "payload.low: is missing" rather than a stack trace.
  */
 public final class EventSchemas {

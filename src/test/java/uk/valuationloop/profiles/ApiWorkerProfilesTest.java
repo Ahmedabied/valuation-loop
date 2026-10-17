@@ -44,7 +44,7 @@ class ApiWorkerProfilesTest {
     @Nested
     @SpringBootTest
     @ActiveProfiles({"test", "worker"})
-    @EmbeddedKafka(kraft = true, partitions = 1, topics = {Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
+    @EmbeddedKafka(partitions = 1, topics = {Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
     @TestPropertySource(properties =
             "spring.datasource.url=jdbc:h2:mem:profile_worker;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
     class Worker {
@@ -70,7 +70,7 @@ class ApiWorkerProfilesTest {
     @Nested
     @SpringBootTest
     @ActiveProfiles({"test", "api"})
-    @EmbeddedKafka(kraft = true, partitions = 1, topics = {Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
+    @EmbeddedKafka(partitions = 1, topics = {Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
     @TestPropertySource(properties =
             "spring.datasource.url=jdbc:h2:mem:profile_api;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
     class Api {

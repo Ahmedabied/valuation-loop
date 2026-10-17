@@ -326,11 +326,12 @@ retention period. The real product would set one by its own policy; this is a kn
 
 ## 17. Versions
 
-Java 21, Spring Boot 3.5.16, spring-kafka 3.3.16 (kafka-clients 3.9.2), Kafka 4.3.1 broker in KRaft mode, Postgres 18,
-Elasticsearch 8.19.4 with `elasticsearch-java` 8.18.8, Gradle 8.14.3 Kotlin DSL, Flyway. Tests use H2 in PostgreSQL
-mode with the same migrations and `@EmbeddedKafka(kraft = true)`, so they need no services. Spring Boot 3.5 left
-open-source support on 2026-06-30; the bump to Boot 4.1 is v2 day 1. It touches the version lines, the Jackson
-imports (Jackson 3 moves to `tools.jackson`), spring-kafka 4.x and the Elasticsearch client line.
+Java 21, Spring Boot 4.1.1, Spring Framework 7.0.9, spring-kafka 4.1.1 (kafka-clients 4.2.1), Jackson 3.1.5,
+Hibernate 7.4.5, Flyway 12.4.0, Kafka 4.3.1 broker in KRaft mode, Postgres 18, Elasticsearch 8.19.4 with
+`elasticsearch-java` 8.18.8 (on its own Jackson 2 mapper; Boot 4.1's 9.x client does not support an 8.19 server),
+Gradle 8.14.3 Kotlin DSL. Tests use H2 in PostgreSQL mode with the same migrations and `@EmbeddedKafka` (KRaft), so
+they need no services. Upgraded to Boot 4.1.x on 2026-10-17; Jackson 3; spring-kafka 4.x (Boot 3.5 had left
+open-source support on 2026-06-30). What changed and what to watch: `docs/adr/0005-boot-4-upgrade-attempt.md`.
 
 ## 18. What was deliberately left out
 

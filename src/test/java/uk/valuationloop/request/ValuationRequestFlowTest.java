@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Map;
@@ -21,7 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -39,7 +39,7 @@ import uk.valuationloop.support.EventSchemas;
 @SpringBootTest(properties = // its own in-memory database, never shared with another test context
         "spring.datasource.url=jdbc:h2:mem:request_flow_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc
-@EmbeddedKafka(kraft = true, partitions = 3, topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER})
+@EmbeddedKafka(partitions = 3, topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER})
 class ValuationRequestFlowTest {
 
     @Autowired MockMvc mvc;
@@ -55,7 +55,7 @@ class ValuationRequestFlowTest {
     void setUp() {
         outbox.deleteAll();
         consumer = new DefaultKafkaConsumerFactory<>(
-                KafkaTestUtils.consumerProps("flow-" + System.nanoTime(), "false", broker),
+                KafkaTestUtils.consumerProps(broker, "flow-" + System.nanoTime(), false),
                 new StringDeserializer(), new StringDeserializer()).createConsumer();
         broker.consumeFromEmbeddedTopics(consumer, Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER);
     }
@@ -77,7 +77,7 @@ class ValuationRequestFlowTest {
                 .andExpect(jsonPath("$.outcode").value("SW11"))
                 .andReturn().getResponse().getContentAsString();
         JsonNode view = json.readTree(response);
-        String requestId = view.get("requestId").asText();
+        String requestId = view.get("requestId").asString();
 
         // four fixture agents hold SW11: 01, 02, 03, 05
         assertThat(view.get("leads")).hasSize(4);
@@ -94,8 +94,8 @@ class ValuationRequestFlowTest {
             JsonNode env = json.readTree(r.value());
             EventSchemas.assertValid(r.value()); // the already-emitted events must match the shared contract
             if (r.topic().equals(Topics.LEAD_DELIVER)) {
-                assertThat(env.get("eventType").asText()).isEqualTo("DeliverLead");
-                assertThat(r.key()).isEqualTo(env.get("leadId").asText());
+                assertThat(env.get("eventType").asString()).isEqualTo("DeliverLead");
+                assertThat(r.key()).isEqualTo(env.get("leadId").asString());
                 deliverKeys.add(r.key());
             } else {
                 assertThat(r.key()).isEqualTo(requestId);
@@ -137,7 +137,7 @@ class ValuationRequestFlowTest {
                 "sellerRef", "seller-test-4", "postcode", "SW11 6ED", "propertyType", "FLAT", "bedrooms", 2,
                 "selectedAgentIds", java.util.List.of("<script>x</script>")));
         mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<"))));
         mvc.perform(get("/valuation-requests/{id}", "<b>x"))
                 .andExpect(status().isNotFound())
@@ -149,7 +149,7 @@ class ValuationRequestFlowTest {
         String body = json.writeValueAsString(Map.of(
                 "sellerRef", "seller-test-3", "postcode", "M20 4AP", "propertyType", "FLAT", "bedrooms", 1));
         mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableContent());
         assertThat(outbox.count()).isZero();   // the whole transaction rolled back, including ValuationRequested
     }
 
@@ -158,7 +158,7 @@ class ValuationRequestFlowTest {
         String body = json.writeValueAsString(Map.of(
                 "sellerRef", "s", "postcode", "<b>not a postcode</b>", "propertyType", "FLAT", "bedrooms", 1));
         mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(jsonPath("$.error").value("invalid"))
@@ -168,7 +168,7 @@ class ValuationRequestFlowTest {
     @Test
     void invalidBodyIs422WithTheFieldNamesAndUnknownRequestIs404() throws Exception {
         mvc.perform(post("/valuation-requests").contentType(MediaType.APPLICATION_JSON).content("{\"bedrooms\": 2}"))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.error").value("invalid"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("postcode")));
         mvc.perform(get("/valuation-requests/vr_does_not_exist"))

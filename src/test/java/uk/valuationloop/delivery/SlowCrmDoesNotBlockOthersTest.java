@@ -46,7 +46,7 @@ import uk.valuationloop.request.ValuationRequestService;
  * handful of tries is enough; 50 is the cap. Then one relay pass sends the chosen request's commands.
  */
 @SpringBootTest
-@EmbeddedKafka(kraft = true, partitions = 6,
+@EmbeddedKafka(partitions = 6,
         topics = {Topics.VALUATION_REQUESTED, Topics.LEAD_DELIVER, Topics.LEAD_EVENTS})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:slow_crm_tests;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
