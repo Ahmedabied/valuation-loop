@@ -38,3 +38,7 @@ tasks.withType<Test> {
     useJUnitPlatform()
     testLogging { events("passed", "skipped", "failed") }
 }
+
+dependencies {
+    developmentOnly("com.h2database:h2") // bootRun only (never in the jar): the "loader" profile runs with an in-memory H2, ES the only real service
+}
