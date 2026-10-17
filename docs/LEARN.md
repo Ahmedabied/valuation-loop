@@ -291,6 +291,14 @@ Model answers are short on purpose. Rewrite each in your own words before the in
 
 This is a draft for the application question about how I use AI. It is not sent anywhere without Ahmed's yes.
 
+Current README wording (2026-10-17; rewrite it in your own words on learn day 2):
+
+> Built with AI pairing. I set the problem, the constraints and the acceptance tests for each claim; Claude
+> (Anthropic) drafted most of the Java, the documentation and the review passes under my direction; I own every line
+> and can defend it. Rightmove's application asks how candidates use AI; this repository is my answer.
+
+Longer draft for the application form:
+
 > I built Valuation Loop with AI pairing, and I can show exactly how. I wrote the brief and the problem statement,
 > then used Claude to run research and two competing designs, and had two separate AI reviewers attack them on product
 > fit and on engineering. The architecture I locked came out of those reviews, and several of their findings are in
