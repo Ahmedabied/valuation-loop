@@ -208,3 +208,13 @@ explain and change every part of it without help.
 4. A static side-by-side page for the seller view.
 5. CI with Testcontainers.
 6. Optional EBM sidecar for the comparables range with an error estimate.
+
+## Side-by-side page
+
+`src/main/resources/static/comparison.html` is the seller's view in a browser: one plain HTML file, vanilla JS, no
+build step, no CDN. Spring Boot serves it at `/comparison.html` under every profile. It reads
+`GET /valuation-requests/{id}/comparison` from the same origin and shows the disclaimer verbatim, then one column per
+reply in reply order: the agent's range, message, reply time, and the attached evidence (comparables range, method,
+data vintage, the past sales) or "No evidence attached". Its buttons post engagement (viewed, contact, visit) and the
+selection. `make page ID=<requestId>` prints the URL; `docs/DEMO.md` says how to get a request id.
+`ComparisonPageTest` checks it is served as HTML and contains none of the never-list words.
