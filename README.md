@@ -20,7 +20,7 @@ The design is in [docs/RFC-001-valuation-loop.md](docs/RFC-001-valuation-loop.md
 | 2 | Every reply can carry an evidence pack built to one standard from real public data, chosen and curated by the agent, machine-readable, with provenance. | `evidence/ComparablesQueryTest.missingFloorAreaGetsHalfWeightInTheSameQuery`, `evidence/ComparablesRankingEsTest.floorAreaMatchRanksAboveMissingFloorArea` and `packFromLiveEsHasProvenanceAndAttachEmitsASchemaValidEvent` (live Elasticsearch) |
 | 3 | The seller's choice, the visit and the instruction join back to the lead even when late and out of order, and one replayable query answers "do evidenced answers win the seller, and at what price gap?". | `scorecard/ScorecardReplayTest.outOfOrderLateAndDuplicateEventsProjectDeterministicallyAndReplayRebuildsIdenticalFacts`, `scorecard/ProductQueryTest.sharesCapturedByTheHighestRangeReplySplitByEvidence` |
 
-All test paths are under `src/test/java/uk/valuationloop/`. There are 120 tests; the two live-Elasticsearch ones run
+All test paths are under `src/test/java/uk/valuationloop/`. There are 125 tests; the two live-Elasticsearch ones run
 only with `make test-es` (`./gradlew test -Pes=true`).
 
 ## The real number
@@ -78,7 +78,7 @@ be read first.
 | `scorecard` | The replayable read model, the agent's private scorecard, the product query, replay | `ScorecardListener`, `ScorecardProjector`, `ScorecardRebuilder`, `ScorecardReplay`, `ProductQuery` |
 | `dataloader` | PPD + Code-Point Open + EPC-derived attributes into Elasticsearch, and the range-width statistic | `ComparablesLoaderRunner`, `EpcLookup`, `AddressKey`, `OsgbToWgs84`, `RangeWidthStatsRunner` |
 | `api` | One JSON error shape and the `nosniff` header for every response | `ApiErrors`, `NoSniffFilter` |
-| `simulator` | Scenario runner for `make demo` (ok, slow, flaky CRM, late reply) <!-- verify after merge --> | <!-- verify after merge --> |
+| `simulator` | Scenario runner for `make demo` (ok, slow, flaky CRM, late reply) and the outbox-gap demo; `demo` profile only | `SimulatorScenarios`, `OutboxGapDemo`, `SimulatorController` |
 
 ## Run it
 
@@ -101,29 +101,34 @@ Gradle comes from the wrapper (`./gradlew`, Gradle 8.14.3).
 ### Steps
 
 ```
-make test            # 120 tests: 118 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
+make test            # 125 tests: 123 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
 make services-up     # Postgres on 5433, Kafka on 9092, Elasticsearch on 9200 (make status to check)
 make test-es         # the same plus the two live-Elasticsearch tests (needs Elasticsearch up)
-make load            # load Wandsworth + Lambeth into Elasticsearch (about 23 s)
+make load            # load Wandsworth + Lambeth into Elasticsearch (about 23 s; make demo runs it if the index is missing)
 make stats           # print the range-width statistic above
 make run             # the app on 127.0.0.1:8080 (actuator on 127.0.0.1:8081), profiles local,demo
-make demo            # scenario run, comparison view and scorecard printed
-make replay          # stop the scorecard consumer, truncate, reset offsets, rebuild, compare with a snapshot
+make demo            # starts the app from the jar, runs every scenario, prints the report, stops the app (not with make run up)
+make replay          # after make demo, app stopped: truncate scorecard_fact, reset offsets, rebuild, compare, exit 0/1
 make services-down
 ```
 
-`make help` lists every target. `make clean-daemons` stops the Gradle daemon when you are done.
+`make help` lists every target. `make clean-daemons` stops the Gradle daemon when you are done (it stops every daemon
+of this Gradle version, so not while another session on the box is building). `make demo` and `make replay` start the
+app themselves on 8080/8081 and refuse if `make run` holds those ports; they wait (up to 3 minutes) while less than
+2.5 GB of RAM is free. A Gradle daemon kept from `make test` holds about 1 GB; stop it first on a tight box.
 
-<!-- verify after merge: the make demo and make replay steps, from a cold start, against the merged Makefile -->
+Checked from a cold start on 2026-10-17: `make test` (125 tests, 2 skipped), `make services-up`, `make demo` twice,
+`make replay` (`replay: IDENTICAL ... (66 facts)`, exit 0), `make test-es` (both live tests pass), `make services-down`.
 
 ### Where logs live
 
 - Kafka, Elasticsearch and Postgres: `~/tools/logs/kafka.log`, `es.log`, `pg.log`.
-- The app: standard output of `make run`.
+- The app: standard output of `make run`; under `make demo`, `~/tools/logs/app.log`, one ECS JSON object per line with
+  `traceId` and `spanId` (the `local` profile). `grep <traceId> ~/tools/logs/app.log` follows one request across the
+  API thread, the outbox relay and both consumers.
+- `make demo` also writes `demo-report.txt` and `demo-comparison.json` there; `make replay` writes `replay.log`.
 - `make replay` writes its snapshot to `~/tools/logs/scorecard-snapshot.json` and logs `IDENTICAL` or the rows that
   differ; it exits 1 if they differ.
-
-<!-- verify after merge: app log format (JSON with traceId) and any demo log file -->
 
 ## API
 
@@ -163,7 +168,9 @@ agent and every query is scoped to it, so another agent's lead is a 404. Errors 
   database right 2026; Contains National Statistics data © Crown copyright and database right 2026"
 - **EPC domestic certificates**: 90.2% of indexed sales matched to a certificate. Only OGL-licensed derived fields
   are indexed: floor area, energy rating, built form, construction age, habitable rooms and a property type
-  refinement. The certificate's address fields are used only in the loader's memory, as a hashed normalised address
+  refinement. The register licenses every field except the address and postcode fields under the Open Government
+  Licence v3.0: "Contains public sector information licensed under the Open Government Licence v3.0." The
+  certificate's address fields are used only in the loader's memory, as a hashed normalised address
   key for the join, and are never stored, indexed, logged or committed.
 - Data vintage on every pack: `ppd-2024-2026+epc-2026-10`.
 - In production the portal would use its own address licences. This demo relies on the non-commercial permission.
@@ -178,11 +185,12 @@ its own data policy, and the RFC records that as a gap.
 
 ## Built with AI pairing
 
-Built with AI pairing: I designed and reviewed, Claude drafted most of the Java; every line is mine to defend. I am a
-Python and Django engineer and this is my first Java and Spring project. The design came first: research, two
-competing designs and two hostile reviews, kept outside this repo. The code and these docs were then written in
-pairing sessions. [docs/LEARN.md](docs/LEARN.md) is the plan I follow to be able to explain and change every part of
-it without help.
+<!-- DRAFT: Ahmed decides the final wording before anything is published. -->
+Built with AI pairing. I set the problem, the constraints and the method; Claude ran the research, drafted two
+competing designs and two hostile reviews of them, and I chose and locked the architecture from those (kept outside
+this repo). Claude then wrote most of the Java and these docs in pairing sessions. I am a Python and Django engineer
+and this is my first Java and Spring project. [docs/LEARN.md](docs/LEARN.md) is the plan I follow to be able to
+explain and change every part of it without help.
 
 ## What it does not prove
 
