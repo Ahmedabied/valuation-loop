@@ -41,6 +41,11 @@ public class CompletionScanner {
         this.enabled = enabled;
     }
 
+    /** Whether the scheduled scan runs in this process (valuationloop.completion.enabled; off in "worker" and tests). */
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     @Scheduled(fixedDelayString = "${valuationloop.completion.scan-ms:60000}")
     public void tick() {
         if (!enabled) {
