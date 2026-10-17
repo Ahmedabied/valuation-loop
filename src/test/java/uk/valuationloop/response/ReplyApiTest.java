@@ -96,7 +96,7 @@ class ReplyApiTest extends DeliveryIntegrationTestBase {
 
         mvc.perform(get("/agents/" + AGENT + "/leads/" + leadId + "/contact"))
                 .andExpect(status().isLocked())
-                .andExpect(jsonPath("$.reason").value("contact is released after you reply"));
+                .andExpect(jsonPath("$.message").value("contact is released after you reply"));
 
         reply(AGENT, leadId, "{\"low\": 500000, \"high\": 540000}").andExpect(status().isCreated());
 
@@ -134,7 +134,7 @@ class ReplyApiTest extends DeliveryIntegrationTestBase {
         });
         reply(AGENT, created.getId(), "{\"low\": 500000, \"high\": 540000}")
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.reason").value(org.hamcrest.Matchers.containsString("CREATED")));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("CREATED")));
     }
 
     @Test
