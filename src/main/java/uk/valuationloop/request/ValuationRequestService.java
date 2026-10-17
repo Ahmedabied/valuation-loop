@@ -6,6 +6,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uk.valuationloop.agent.AgentDirectory;
@@ -25,6 +27,8 @@ import uk.valuationloop.request.RequestTransitions.RequestEvent;
  */
 @Service
 public class ValuationRequestService {
+
+    private static final Logger log = LoggerFactory.getLogger(ValuationRequestService.class);
 
     public record CreateCommand(String sellerRef, String postcode, PropertyType propertyType, int bedrooms,
                                 BigDecimal floorAreaM2, List<String> selectedAgentIds) {}
@@ -82,6 +86,8 @@ public class ValuationRequestService {
                     request.getId(), lead.getId(), agent.id(), Map.of("adapter", agent.adapter())));
         }
         request.apply(new RequestEvent.LeadsDispatched(), now);
+        log.info("request {} for {}: {} lead(s), one DeliverLead each, in the outbox",
+                request.getId(), request.getOutcode(), created.size());   // the outcode only: no address in logs
         return new Created(request, created);
     }
 

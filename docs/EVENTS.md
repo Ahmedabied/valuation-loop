@@ -2,7 +2,7 @@
 
 Every event travels in one JSON envelope (`outbox/EventEnvelope.java`, ARCHITECTURE.md §4):
 `eventId` (uuidv7), `eventType`, `schemaVersion` (1), `occurredAt`, `requestId`, `leadId`, `agentId`,
-`traceparent` (nullable), `payload`. Request-level events have `leadId` and `agentId` null; every lead-level event
+`traceparent` (W3C, the span that wrote the event, see `observability/EventTracing.java`; null when tracing is off, as in tests), `payload`. Request-level events have `leadId` and `agentId` null; every lead-level event
 carries both. Names are in `outbox/EventTypes.java`, topics in `outbox/Topics.java`, and each event has a JSON Schema
 (draft 2020-12, unknown payload fields rejected) in `src/main/resources/events/<EventType>.schema.json`.
 Tests check emitted events with `EventSchemas.assertValid(json)` (`src/test/java/uk/valuationloop/support/`).
