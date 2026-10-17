@@ -188,12 +188,9 @@ its own data policy, and the RFC records that as a gap.
 
 ## Built with AI pairing
 
-<!-- DRAFT: Ahmed decides the final wording before anything is published. -->
-Built with AI pairing. I set the problem, the constraints and the method; Claude ran the research, drafted two
-competing designs and two hostile reviews of them, and I chose and locked the architecture from those (kept outside
-this repo). Claude then wrote most of the Java and these docs in pairing sessions. I am a Python and Django engineer
-and this is my first Java and Spring project. [docs/LEARN.md](docs/LEARN.md) is the plan I follow to be able to
-explain and change every part of it without help.
+Built with AI pairing. I set the problem, the constraints and the acceptance tests for each claim; Claude (Anthropic)
+drafted most of the Java, the documentation and the review passes under my direction; I own every line and can defend
+it. Rightmove's application asks how candidates use AI; this repository is my answer.
 
 ## What it does not prove
 
