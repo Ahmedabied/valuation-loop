@@ -52,13 +52,14 @@ class ScorecardReplayTest extends LoopApiTestBase {
         return json;
     }
 
-    static Map<String, Object> reply(long low, long high, boolean late) {
+    static Map<String, Object> reply(long low, long high, boolean late, Duration at) {
         Map<String, Object> p = new LinkedHashMap<>();
         p.put("low", low);
         p.put("high", high);
         p.put("message", null);
         p.put("late", late);
         p.put("deliveredAt", T0.toString());
+        p.put("repliedAt", T0.plus(at).toString());
         return p;
     }
 
@@ -77,7 +78,7 @@ class ScorecardReplayTest extends LoopApiTestBase {
     @Test
     void outOfOrderLateAndDuplicateEventsProjectDeterministicallyAndReplayRebuildsIdenticalFacts() throws Exception {
         Duration m = Duration.ofMinutes(1);
-        String a2Reply = envelope(EventTypes.LEAD_REPLIED, A, A2, AG2, m.multipliedBy(300), reply(520000, 580000, false));
+        String a2Reply = envelope(EventTypes.LEAD_REPLIED, A, A2, AG2, m.multipliedBy(300), reply(520000, 580000, false, m.multipliedBy(300)));
         String a1Instructed = envelope(EventTypes.INSTRUCTION_RECORDED, A, A1, AG1, Duration.ofDays(3),
                 Map.of("leadRef", A1, "source", "fake-crm", "recordedAt", T0.plus(Duration.ofDays(3)).toString()));
 
@@ -92,22 +93,22 @@ class ScorecardReplayTest extends LoopApiTestBase {
         lead.add(new String[]{A, envelope(EventTypes.SELLER_SELECTED, A, A1, AG1, Duration.ofHours(6), Map.of())});
         lead.add(new String[]{A, a2Reply});
         lead.add(new String[]{A, envelope(EventTypes.LEAD_EXPIRED, A, A3, AG3, Duration.ofHours(24), Map.of("replyDueAt", T0.plus(Duration.ofHours(24)).toString()))});
-        lead.add(new String[]{A, envelope(EventTypes.LEAD_REPLIED, A, A1, AG1, m.multipliedBy(90), reply(500000, 540000, false))});
+        lead.add(new String[]{A, envelope(EventTypes.LEAD_REPLIED, A, A1, AG1, m.multipliedBy(90), reply(500000, 540000, false, m.multipliedBy(90)))});
         lead.add(new String[]{A, envelope(EventTypes.LEAD_DELIVERED, A, A1, AG1, Duration.ZERO, Map.of("adapter", "ok", "attempt", 1))});
         lead.add(new String[]{A, envelope(EventTypes.EVIDENCE_ATTACHED, A, A1, AG1, m.multipliedBy(95), Map.of("packId", "ep_replay_a1",
                 "comparablesCount", 4, "comparablesRange", Map.of("low", 495000, "mid", 520000, "high", 545000)))});
         lead.add(new String[]{A, envelope(EventTypes.SELLER_ENGAGED, A, A2, AG2, Duration.ofHours(5), Map.of("action", "VIEWED"))});
-        lead.add(new String[]{A, envelope(EventTypes.LEAD_REPLIED, A, A3, AG3, Duration.ofHours(30), reply(480000, 500000, true))}); // late, after expiry
+        lead.add(new String[]{A, envelope(EventTypes.LEAD_REPLIED, A, A3, AG3, Duration.ofHours(30), reply(480000, 500000, true, Duration.ofHours(30)))}); // late, after expiry
         lead.add(new String[]{A, a2Reply});   // the same event again (same eventId): at-least-once delivery
         lead.add(new String[]{A, envelope(EventTypes.LEAD_DELIVERED, A, A2, AG2, Duration.ZERO, Map.of("adapter", "slow", "attempt", 1))});
         lead.add(new String[]{A, envelope(EventTypes.SELLER_ENGAGED, A, A1, AG1, Duration.ofHours(5), Map.of("action", "CONTACTED"))});
         lead.add(new String[]{A, envelope(EventTypes.LEAD_DELIVERED, A, A3, AG3, Duration.ZERO, Map.of("adapter", "flaky", "attempt", 3))});
         // request B
         lead.add(new String[]{B, envelope(EventTypes.VISIT_BOOKED, B, B1, AG1, Duration.ofHours(20), mapOf("visitAt", T0.plus(Duration.ofDays(2)).toString()))});
-        lead.add(new String[]{B, envelope(EventTypes.LEAD_REPLIED, B, B2, AG2, m.multipliedBy(120), reply(650000, 690000, false))});
+        lead.add(new String[]{B, envelope(EventTypes.LEAD_REPLIED, B, B2, AG2, m.multipliedBy(120), reply(650000, 690000, false, m.multipliedBy(120)))});
         lead.add(new String[]{B, envelope(EventTypes.LEAD_DELIVERY_FAILED, B, B3, AG3, Duration.ofMinutes(2), Map.of("adapter", "flaky", "attempts", 3, "reason", "adapter 'flaky' failed on every attempt (CrmUnavailable)"))});
         lead.add(new String[]{B, envelope(EventTypes.LEAD_DELIVERED, B, B1, AG1, Duration.ZERO, Map.of("adapter", "ok", "attempt", 1))});
-        lead.add(new String[]{B, envelope(EventTypes.LEAD_REPLIED, B, B1, AG1, m.multipliedBy(60), reply(700000, 760000, false))});
+        lead.add(new String[]{B, envelope(EventTypes.LEAD_REPLIED, B, B1, AG1, m.multipliedBy(60), reply(700000, 760000, false, m.multipliedBy(60)))});
         lead.add(new String[]{B, envelope(EventTypes.LEAD_DELIVERED, B, B2, AG2, Duration.ZERO, Map.of("adapter", "slow", "attempt", 1))});
         for (String[] r : lead) {
             send(Topics.LEAD_EVENTS, r[0], r[1]);
