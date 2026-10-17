@@ -5,6 +5,13 @@ missing, builds the jar, starts the app under the
 `local,demo` profiles (logs: `~/tools/logs/app.log`, JSON), runs every scenario, prints what follows, and stops the app
 it started. The services stay up; `make services-down` stops them. It can be run again straight away.
 
+Clean numbers: run `make demo-reset` before a demo you will show someone; the database otherwise accumulates every
+run. It stops the demo app (and a split run this repo started), Kafka and Postgres, deletes `~/tools/kafka-data`,
+`~/tools/pgdata` and `~/tools/logs/scorecard-snapshot.json`, and prints what it removed. The Elasticsearch data and
+`~/tools/pg.pw` stay. The next `make demo` re-initialises both: Postgres initdb + Flyway V1-V5, Kafka
+`format --standalone`. It refuses (exit 1, nothing deleted) if Kafka or Postgres is still running on those
+directories after the stop attempt.
+
 ## What it prints, in order
 1. **`POST /simulator/scenarios/all`**: one block per scenario: request id, its `traceId`, one line per lead
    (adapter, delivery attempts, state, delivery time, reply range, late, evidence attached) and the checks it made.
@@ -19,7 +26,7 @@ it started. The services stay up; `make services-down` stops them. It can be run
 3. **`GET /valuation-requests/{id}/comparison`** for the `ok` request: replies in reply order, the disclaimer, the pack.
 4. **`GET /agents/{selected}/scorecard`**: that agent's own numbers next to a labelled fixture benchmark.
 5. **`GET /scorecard/product-query`** (internal, demo profile): share of engagement and instructions won by the
-   highest-range reply, split by evidence attached. Numbers grow with each run: the demo data accumulates. The
+   highest-range reply, split by evidence attached. Numbers grow with each run: the demo data accumulates (`make demo-reset` first for one run's numbers). The
    scenarios are scripted (the evidenced agent replies at its comparables' range and is always the one selected), so
    these numbers show the query works end to end, not that evidence wins sellers.
 6. **Metrics** from `127.0.0.1:8081/actuator/prometheus`:
