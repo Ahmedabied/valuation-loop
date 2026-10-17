@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CompletionMatched",
+  "description": "The instructed lead's eventual sale, found in Land Registry Price Paid Data by the completion scanner (the v2 late match). Private outcome fact for the agent's own scorecard and the internal product query, never the seller page. Topic outcome.recorded.v1, key requestId. Full envelope, schemaVersion 1 (see docs/EVENTS.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "occurredAt",
+    "requestId",
+    "leadId",
+    "agentId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "uuidv7; the idempotency key"
+    },
+    "eventType": {
+      "const": "CompletionMatched"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^vr_"
+    },
+    "leadId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^ld_"
+    },
+    "agentId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^ag_"
+    },
+    "traceparent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "W3C trace context; null when no span is active"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ppdTransactionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Land Registry PPD transaction unique identifier"
+        },
+        "completedPrice": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "PPD price paid, whole pounds"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date",
+          "description": "PPD date of transfer"
+        },
+        "matchRule": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "the rule that matched the sale to the lead"
+        }
+      },
+      "required": [
+        "ppdTransactionId",
+        "completedPrice",
+        "completedAt",
+        "matchRule"
+      ]
+    }
+  }
+}
