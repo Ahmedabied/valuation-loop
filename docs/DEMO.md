@@ -11,7 +11,7 @@ it started. The services stay up; `make services-down` stops them. It can be run
    | Scenario | What happens | Claim (ARCHITECTURE §0) |
    |---|---|---|
    | `ok` | 3 agents; the flaky CRM lands on attempt 3 via `-retry-0/-retry-1`. One agent builds a pack from live ES, removes a comparable, replies at its comparables' range and attaches it; the seller views all, asks that agent for a visit and selects it; the visit is booked; the CRM webhook (leadRef) reports the instruction; the scorecard fact shows `instructed=true` | 1, 2, 3 |
-   | `slow` | same loop with the 2 s CRM; delivery time per lead. One partition: a lead queued behind the slow one waits too | 1 |
+   | `slow` | same loop with the 2 s CRM; each lead's `lead.deliver.v1` partition and delivery time. Six partitions, three listener threads, keyed by leadId: the ok leads are delivered in a few hundred ms while the slow one takes 2 s (two leads hashed onto one thread would still queue; the line shows the partitions) | 1 |
    | `flaky-crm` | the flaky CRM never accepts: 3 attempts, `lead.deliver.v1-dlt`, `DELIVERY_FAILED`, `dlt_records_total` +1; the other lead is delivered, replies, the request goes on; the seller page never names the failed lead | 1 |
    | `late-reply` | a lead passes its reply window (the deadline service judged at `reply_due_at + 1 s`), `EXPIRED`; the late reply is accepted, `late=true` in the agent's own view, no late flag on the seller page | 3 |
 2. **`POST /simulator/outbox-gap`**: relay paused, request committed: its rows sit unsent (the state a crash between
@@ -33,6 +33,30 @@ it started. The services stay up; `make services-down` stops them. It can be run
 Run after a demo (the app must be stopped; the script refuses if 8080/8081 are taken). It starts the app in replay
 mode: snapshot `scorecard_fact`, stop the scorecard consumer, truncate, reset group `scorecard` to the earliest
 offsets, consume to the end, compare. Expected: `replay: N facts rebuilt`, `replay: IDENTICAL ...`, exit 0.
+
+## Split run
+The same jar as two processes (`application-api.yml`, `application-worker.yml`):
+
+| Process | Profile | Ports | Runs |
+|---|---|---|---|
+| api | `local,demo,api` | 8080 / actuator 8081 | HTTP API, request/reply/evidence/outcome flows, scorecard consumer, simulator |
+| worker | `local,demo,worker` | 8090 / actuator 8091 | `lead.deliver.v1` listener with its retry topics and DLT handler, deadline scanner, outbox relay |
+
+The api still writes its outbox rows in its own transactions; the worker's relay (the only one running) sends them
+from the shared Postgres. The DLT handler, and the request closure when every lead failed, run in the worker and
+write through the same database and outbox. In the api the delivery listener bean exists but its containers never start.
+
+`make run-api`, `make run-worker`, `make run-split` start them in the background (pidfiles and logs
+`~/tools/logs/{api,worker}.{pid,log}`, api first so Flyway runs once at a time); `scripts/split.sh stop` stops them.
+`make demo-split` starts the services and both processes, runs `POST /simulator/scenarios/all` against the api,
+prints the report, how many delivery / DLT / scorecard log lines each process wrote, `dlt_records_total` and
+`outbox_unsent` from the worker's 8091 and `reply_minutes` from the api's 8081, then stops both processes (the
+services stay up). The simulator still calls the services in-process, but every DeliverLead now crosses from one JVM
+to the other through Kafka: before the first scenario it waits for consumer group `delivery` to hold every
+`lead.deliver.v1` partition (asked of the broker, not of local containers), then each scenario waits for its leads to
+reach DELIVERED. The flaky-crm scenario sets the worker's flaky adapter and reads its DLT count through the worker's
+demo-only `/internal/demo/delivery/*` routes. `POST /simulator/outbox-gap` is a one-process demo (it pauses the relay
+of the process it runs in) and is not part of the split run.
 
 ## When something is off
 `make status` (by port). The app log is `~/tools/logs/app.log`, the replay's `~/tools/logs/replay.log`. A scenario
