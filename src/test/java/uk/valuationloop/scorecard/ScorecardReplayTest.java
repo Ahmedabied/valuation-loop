@@ -24,7 +24,8 @@ import uk.valuationloop.outbox.UuidV7;
 import uk.valuationloop.support.EventSchemas;
 
 /**
- * Claim 3: out-of-order and late events still join to the lead, a duplicate changes nothing, and a replay
+ * Claim 3: out-of-order and late events still join to the lead (the Land Registry completion included: for A1 it
+ * arrives before the instruction and before the reply, for B2 after both), a duplicate changes nothing, and a replay
  * (truncate, reset offsets, restart) rebuilds identical facts.
  *
  * The test plays the role of every producer: it writes schema-valid envelopes straight onto lead.events.v1 and
@@ -82,10 +83,17 @@ class ScorecardReplayTest extends LoopApiTestBase {
         String a1Instructed = envelope(EventTypes.INSTRUCTION_RECORDED, A, A1, AG1, Duration.ofDays(3),
                 Map.of("leadRef", A1, "source", "fake-crm", "recordedAt", T0.plus(Duration.ofDays(3)).toString()));
 
-        // the outcome topic first: A1's instruction arrives before anything else is known about A1
+        String a1Completed = envelope(EventTypes.COMPLETION_MATCHED, A, A1, AG1, Duration.ofDays(40),
+                completion("ppd-replay-a1", 531_000, "2026-11-06"));
+
+        // the outcome topic first: A1's completion, then its instruction, arrive before anything else is known about A1
+        send(Topics.OUTCOME_RECORDED, A, a1Completed);
         send(Topics.OUTCOME_RECORDED, A, a1Instructed);
         send(Topics.OUTCOME_RECORDED, B, envelope(EventTypes.INSTRUCTION_RECORDED, B, B2, AG2, Duration.ofDays(2),
                 Map.of("leadRef", B2, "source", "fake-crm", "recordedAt", T0.plus(Duration.ofDays(2)).toString())));
+        // B2's completion arrives in the natural order: after its instruction
+        send(Topics.OUTCOME_RECORDED, B, envelope(EventTypes.COMPLETION_MATCHED, B, B2, AG2, Duration.ofDays(50),
+                completion("ppd-replay-b2", 640_000, "2026-11-15")));
 
         List<String[]> lead = new ArrayList<>();   // {requestId, json} on lead.events.v1, in this (bad) order
         // request A
@@ -128,7 +136,10 @@ class ScorecardReplayTest extends LoopApiTestBase {
         assertThat(a1.sellerSelected()).isTrue();
         assertThat(a1.visitBooked()).isTrue();
         assertThat(a1.instructed()).isTrue();             // arrived first of all, still joined to the lead
-        assertThat(a1.lastEventAt()).isEqualTo(T0.plus(Duration.ofDays(3)).toString());
+        assertThat(a1.completedPrice()).isEqualTo(531_000L);   // arrived before the reply: the gap was derived later
+        assertThat(a1.completedAt()).isEqualTo("2026-11-06");
+        assertThat(a1.priceGapPct()).isEqualTo("2.12");   // (531k - 520k) / 520k = +2.115 %
+        assertThat(a1.lastEventAt()).isEqualTo(T0.plus(Duration.ofDays(40)).toString());
 
         FactSnapshot a2 = fact(first, A2);
         assertThat(a2.replyMinutes()).isEqualTo(300);
@@ -152,6 +163,11 @@ class ScorecardReplayTest extends LoopApiTestBase {
         FactSnapshot b2 = fact(first, B2);
         assertThat(b2.rangeRank()).isEqualTo("LOWEST");
         assertThat(b2.instructed()).isTrue();
+        assertThat(b2.completedPrice()).isEqualTo(640_000L);
+        assertThat(b2.priceGapPct()).isEqualTo("-4.48");  // (640k - 670k) / 670k = -4.478 %
+
+        assertThat(a2.completedPrice()).isNull();         // no completion: no gap
+        assertThat(a2.priceGapPct()).isNull();
 
         FactSnapshot b3 = fact(first, B3);                // delivery failed: one of the agent's leads, nothing else
         assertThat(b3.deliveredAt()).isNull();
@@ -162,6 +178,7 @@ class ScorecardReplayTest extends LoopApiTestBase {
         // a duplicate event changes nothing
         send(Topics.LEAD_EVENTS, A, a2Reply);
         send(Topics.OUTCOME_RECORDED, A, a1Instructed);
+        send(Topics.OUTCOME_RECORDED, A, a1Completed);
         rebuilder.awaitCaughtUp(Duration.ofSeconds(30));
         assertThat(ourFacts()).isEqualTo(first);
 
@@ -178,6 +195,8 @@ class ScorecardReplayTest extends LoopApiTestBase {
                 .andExpect(jsonPath("$.sellerSelected").value(1))
                 .andExpect(jsonPath("$.visitsBooked").value(2))
                 .andExpect(jsonPath("$.instructed").value(1))
+                .andExpect(jsonPath("$.completed").value(1))
+                .andExpect(jsonPath("$.medianPriceGapPct").value(2.12))
                 .andExpect(jsonPath("$.benchmark.label").value("fixture benchmark"))
                 .andReturn().getResponse().getContentAsString();
         assertThat(card).doesNotContain(AG2).doesNotContain(AG3).doesNotContain("ld_");
@@ -192,6 +211,11 @@ class ScorecardReplayTest extends LoopApiTestBase {
 
         // the snapshot endpoint the demo script diffs shows the same rows
         mvc.perform(get("/scorecard/snapshot")).andExpect(status().isOk()).andExpect(jsonPath("$").isArray());
+    }
+
+    static Map<String, Object> completion(String ppdTransactionId, long price, String completedAt) {
+        return Map.of("ppdTransactionId", ppdTransactionId, "completedPrice", price, "completedAt", completedAt,
+                "matchRule", "postcode+propertyType+dateOfTransfer>=instructedAt-30d");
     }
 
     /** Map.of() refuses null values; VisitBooked's visitAt may be null. */
