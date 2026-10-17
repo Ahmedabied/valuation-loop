@@ -20,7 +20,7 @@ The design is in [docs/RFC-001-valuation-loop.md](docs/RFC-001-valuation-loop.md
 | 2 | Every reply can carry an evidence pack built to one standard from real public data, chosen and curated by the agent, machine-readable, with provenance. | `evidence/ComparablesQueryTest.missingFloorAreaGetsHalfWeightInTheSameQuery`, `evidence/ComparablesRankingEsTest.floorAreaMatchRanksAboveMissingFloorArea` and `packFromLiveEsHasProvenanceAndAttachEmitsASchemaValidEvent` (live Elasticsearch) |
 | 3 | The seller's choice, the visit and the instruction join back to the lead even when late and out of order, and one replayable query answers "do evidenced answers win the seller, and at what price gap?". | `scorecard/ScorecardReplayTest.outOfOrderLateAndDuplicateEventsProjectDeterministicallyAndReplayRebuildsIdenticalFacts`, `scorecard/ProductQueryTest.sharesCapturedByTheHighestRangeReplySplitByEvidence` |
 
-All test paths are under `src/test/java/uk/valuationloop/`. There are 131 tests; the two live-Elasticsearch ones run
+All test paths are under `src/test/java/uk/valuationloop/`. There are 143 tests; the two live-Elasticsearch ones run
 only with `make test-es` (`./gradlew test -Pes=true`).
 
 ## The real number
@@ -59,6 +59,10 @@ POST .../engagement, selection -> SellerEngaged, SellerSelected, RequestClosed
 Postgres = system of record     Kafka = the asynchronous seams     Elasticsearch = comparables
 ```
 
+The same jar also runs as two processes (`make demo-split`): a `worker` with the delivery listener, its retry topics
+and DLT, the deadline scanner and the outbox relay, and an `api` with everything else. The Land Registry late match
+(`completion`) adds the completed price to the instructed lead's fact.
+
 ## Modules
 
 Packages under `src/main/java/uk/valuationloop/`. Each module with a `package-info.java` has a short note written to
@@ -76,6 +80,7 @@ be read first.
 | `comparison` | The seller's side-by-side view and the seller's actions | `ComparisonQuery`, `SellerActions`, `ComparisonController` |
 | `outcome` | Visit booked by the agent, instruction by CRM webhook carrying `leadRef` | `OutcomeController`, `OutcomeService`, `WebhookTokenCheck` |
 | `scorecard` | The replayable read model, the agent's private scorecard, the product query, replay | `ScorecardListener`, `ScorecardProjector`, `ScorecardRebuilder`, `ScorecardReplay`, `ProductQuery` |
+| `completion` | The Land Registry late match: instructed leads joined to their sale in Price Paid Data, `CompletionMatched`, the price gap | `CompletionScanner`, `MatchRule`, `CompletionService`, `EsCompletedSales` |
 | `dataloader` | PPD + Code-Point Open + EPC-derived attributes into Elasticsearch, and the range-width statistic | `ComparablesLoaderRunner`, `EpcLookup`, `AddressKey`, `OsgbToWgs84`, `RangeWidthStatsRunner` |
 | `api` | One JSON error shape and the `nosniff` header for every response | `ApiErrors`, `NoSniffFilter` |
 | `simulator` | Scenario runner for `make demo` (ok, slow, flaky CRM, late reply) and the outbox-gap demo; `demo` profile only | `SimulatorScenarios`, `OutboxGapDemo`, `SimulatorController` |
@@ -101,7 +106,7 @@ Gradle comes from the wrapper (`./gradlew`, Gradle 8.14.3).
 ### Steps
 
 ```
-make test            # 131 tests: 129 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
+make test            # 143 tests: 141 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
 make services-up     # Postgres on 5433, Kafka on 9092, Elasticsearch on 9200 (make status to check)
 make test-es         # the same plus the two live-Elasticsearch tests (needs Elasticsearch up)
 make load            # load Wandsworth + Lambeth into Elasticsearch (about 23 s; make demo runs it if the index is missing)
@@ -109,6 +114,9 @@ make stats           # print the range-width statistic above
 make run             # the app on 127.0.0.1:8080 (actuator on 127.0.0.1:8081), profiles local,demo
 make demo            # starts the app from the jar, runs every scenario, prints the report, stops the app (not with make run up)
 make replay          # after make demo, app stopped: truncate scorecard_fact, reset offsets, rebuild, compare, exit 0/1
+make demo-split      # the same jar as two processes: api on 8080 (actuator 8081), worker on 8090 (actuator 8091)
+make run-split       # api + worker in the background (or make run-api / make run-worker); scripts/split.sh stop
+make page ID=<id>    # print the URL of the seller's side-by-side page for a request (the app must be running)
 make services-down
 ```
 
@@ -119,6 +127,27 @@ app themselves on 8080/8081 and refuse if `make run` holds those ports; they wai
 
 Checked from a cold start on 2026-10-17: `make test` (125 tests, 2 skipped), `make services-up`, `make demo` twice,
 `make replay` (`replay: IDENTICAL ... (66 facts)`, exit 0), `make test-es` (both live tests pass), `make services-down`.
+
+### Side-by-side page
+
+`src/main/resources/static/comparison.html` is the seller's view in a browser: one plain HTML file, vanilla JS, no
+build step, no CDN. Spring Boot serves it at `/comparison.html` under every profile. It reads
+`GET /valuation-requests/{id}/comparison` from the same origin and shows the disclaimer verbatim, then one column per
+reply in reply order: the agent's range, message, reply time, and the attached evidence (comparables range, method,
+data vintage, the past sales) or "No evidence attached". Its buttons post engagement (viewed, contact, visit) and the
+selection. `make page ID=<requestId>` prints the URL; `docs/DEMO.md` says how to get a request id.
+`ComparisonPageTest` checks it is served as HTML and contains none of the never-list words.
+
+### CI and licence
+
+[![CI](https://github.com/Ahmedabied/valuation-loop/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmedabied/valuation-loop/actions/workflows/ci.yml)
+
+`.github/workflows/ci.yml` runs on every push and pull request. Job `test`: JDK 21 (Temurin), `./gradlew test` on H2
+and embedded Kafka, no services. Job `test-es` (after `test`): an Elasticsearch 8.19.4 service container, then
+`./gradlew test -Pes=true`, which adds the live-Elasticsearch tests. Test reports are uploaded when a job fails.
+Dependabot checks Gradle dependencies weekly.
+
+Code: MIT (see LICENSE). Data: see Data and licences above.
 
 ### Where logs live
 
@@ -202,30 +231,10 @@ it. the portal's application asks how candidates use AI; this repository is my a
 
 ## v2
 
-1. Bump to Spring Boot 4.1 (Boot 3.5 left open-source support on 2026-06-30).
-2. Split `delivery` into a second deployable; the Kafka seam already exists.
-3. Land Registry late match: join completions back to the lead by address, months later.
-4. A static side-by-side page for the seller view.
-5. CI with Testcontainers.
-6. Optional EBM sidecar for the comparables range with an error estimate.
+Done after v1 (2026-10-17): slow-CRM isolation (6 partitions, 3 listener threads, a 5 s adapter timeout), the
+api/worker split from one jar, the Land Registry late match (postcode + type + date; demo-only self-match), the static
+side-by-side page, CI on GitHub Actions. What is left:
 
-## Side-by-side page
-
-`src/main/resources/static/comparison.html` is the seller's view in a browser: one plain HTML file, vanilla JS, no
-build step, no CDN. Spring Boot serves it at `/comparison.html` under every profile. It reads
-`GET /valuation-requests/{id}/comparison` from the same origin and shows the disclaimer verbatim, then one column per
-reply in reply order: the agent's range, message, reply time, and the attached evidence (comparables range, method,
-data vintage, the past sales) or "No evidence attached". Its buttons post engagement (viewed, contact, visit) and the
-selection. `make page ID=<requestId>` prints the URL; `docs/DEMO.md` says how to get a request id.
-`ComparisonPageTest` checks it is served as HTML and contains none of the never-list words.
-
-## CI and licence
-
-[![CI](https://github.com/Ahmedabied/valuation-loop/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmedabied/valuation-loop/actions/workflows/ci.yml)
-
-`.github/workflows/ci.yml` runs on every push and pull request. Job `test`: JDK 21 (Temurin), `./gradlew test` on H2
-and embedded Kafka, no services. Job `test-es` (after `test`): an Elasticsearch 8.19.4 service container, then
-`./gradlew test -Pes=true`, which adds the live-Elasticsearch tests. Test reports are uploaded when a job fails.
-Dependabot checks Gradle dependencies weekly.
-
-Code: MIT (see LICENSE). Data: see Data and licences above.
+1. Bump to Spring Boot 4.1 (Boot 3.5 left open-source support on 2026-06-30). In progress next.
+2. Testcontainers-based integration tests against real Postgres and Kafka (CI uses H2 and embedded Kafka today).
+3. Optional EBM sidecar for the comparables range with an error estimate.

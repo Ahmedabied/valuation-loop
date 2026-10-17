@@ -11,7 +11,7 @@ public final class Topics {
 
     /**
      * Command: DeliverLead, one record per lead. Key: leadId, so with several partitions and listener threads one
-     * request's leads spread out (v1 runs one partition and one thread; see delivery/SlowAdapter). Retries below.
+     * request's leads spread out (6 partitions, 3 listener threads; see delivery/DeliveryTopics). Retries below.
      */
     public static final String LEAD_DELIVER = "lead.deliver.v1";
 
