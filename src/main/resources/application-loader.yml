@@ -1,0 +1,24 @@
+# Profile "loader": run the data loader (--loader.run=true) or the range-width statistic (--loader.stats=true)
+# with Elasticsearch ONLY. No Postgres, no Kafka, no web server:
+#   SPRING_PROFILES_ACTIVE=loader ./gradlew bootRun --args="--loader.run=true"
+# The app still needs a datasource to start (JPA), so it gets a throwaway H2 in memory, like the tests;
+# the loader writes nothing to it. H2 is on bootRun's classpath through the developmentOnly configuration.
+spring:
+  main:
+    web-application-type: none     # no HTTP port: the process exits when the runner finishes
+  datasource:
+    url: jdbc:h2:mem:loader;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  kafka:
+    listener:
+      auto-startup: false          # no consumer connects to a broker
+
+valuationloop:
+  outbox:
+    enabled: false                 # the relay never ticks, so nothing tries to reach Kafka
+
+management:
+  server:
+    port: -1                       # no actuator port either

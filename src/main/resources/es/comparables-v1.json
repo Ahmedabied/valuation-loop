@@ -1,0 +1,27 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "ppdTransactionId":    { "type": "keyword" },
+      "price":               { "type": "long" },
+      "dateOfTransfer":      { "type": "date", "format": "strict_date" },
+      "postcode":            { "type": "keyword" },
+      "outcode":             { "type": "keyword" },
+      "location":            { "type": "geo_point" },
+      "propertyType":        { "type": "keyword" },
+      "builtForm":           { "type": "keyword" },
+      "newBuild":            { "type": "boolean" },
+      "tenure":              { "type": "keyword" },
+      "floorAreaM2":         { "type": "float" },
+      "epcBand":             { "type": "keyword" },
+      "constructionAgeBand": { "type": "keyword" },
+      "habitableRooms":      { "type": "integer" },
+      "district":            { "type": "keyword" },
+      "dataVintage":         { "type": "keyword" }
+    }
+  }
+}
