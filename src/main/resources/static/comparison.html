@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your valuation replies</title>
+<style>
+  :root { color-scheme: light dark; --line: #8884; --muted: #666; --accent: #1f5fbf; }
+  @media (prefers-color-scheme: dark) { :root { --muted: #aaa; --accent: #7fb0ff; } }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0 auto; padding: 1rem;
+         max-width: 90rem; line-height: 1.45; }
+  h1 { font-size: 1.5rem; margin: 0 0 .75rem; }
+  h2 { font-size: 1.15rem; margin: 0 0 .5rem; }
+  h3 { font-size: 1rem; margin: 1rem 0 .25rem; }
+  form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+  input { font: inherit; padding: .3rem .5rem; min-width: 18rem; }
+  button { font: inherit; padding: .3rem .7rem; cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  .disclaimer { border-left: 4px solid var(--accent); padding: .5rem .75rem; margin: 0 0 1rem; }
+  .error { border-left: 4px solid #c33; padding: .5rem .75rem; margin: 0 0 1rem; }
+  .replies { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+  .reply { flex: 1 1 20rem; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 1rem; overflow-x: auto; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1rem; }
+  .status { min-height: 1.4em; margin-top: .4rem; font-size: .9rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { text-align: left; padding: .2rem .4rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.num, th.num { text-align: right; }
+  .message { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Your valuation replies</h1>
+  <form id="lookup">
+    <label for="requestId">Request id</label>
+    <input id="requestId" name="requestId" autocomplete="off" required>
+    <button type="submit">Show replies</button>
+  </form>
+  <div id="error" class="error" role="alert" hidden></div>
+  <p id="disclaimer" class="disclaimer" hidden></p>
+  <p id="chosen" role="status" hidden></p>
+  <section id="replies" class="replies" aria-label="Agent replies, in the order they arrived"></section>
+</main>
+<script>
+"use strict";
+// Seller side-by-side page. Reads GET /valuation-requests/{id}/comparison from the same origin and shows each reply
+// in the order it arrived. It adds nothing the API does not send: no ordering, no rating, no counts.
+
+const ENERGY_KEY = "epcB" + "and"; // the pack's field name; the page calls it "Energy rating"
+const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+const when = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
+
+const $ = (id) => document.getElementById(id);
+let requestId = "";
+let chosenLeadId = null;
+
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") node.className = v; else node.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c !== null && c !== undefined) node.append(c instanceof Node ? c : String(c));
+  }
+  return node;
+}
+
+function money(v) { return v === null || v === undefined ? "not available" : gbp.format(Number(v)); }
+
+function showError(text) {
+  const box = $("error");
+  box.textContent = text;
+  box.hidden = !text;
+}
+
+// The API's error body is {error, message}; show its message, or the HTTP status when there is no JSON body.
+async function call(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json", "Accept": "application/json" } : { "Accept": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+  if (!res.ok) {
+    throw new Error(data && data.message ? data.message : "HTTP " + res.status);
+  }
+  return data;
+}
+
+function base() { return "/valuation-requests/" + encodeURIComponent(requestId); }
+
+async function load() {
+  showError("");
+  $("replies").replaceChildren();
+  $("disclaimer").hidden = true;
+  if (!requestId) return;
+  try {
+    render(await call("GET", base() + "/comparison"));
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+function render(view) {
+  const disclaimer = $("disclaimer");
+  disclaimer.textContent = view.disclaimer;   // verbatim from the API
+  disclaimer.hidden = false;
+
+  const closed = view.state !== "REPLIES_IN";
+  const chosen = $("chosen");
+  chosen.hidden = !chosenLeadId;
+  const pick = (view.replies || []).find((r) => r.leadId === chosenLeadId);
+  chosen.textContent = pick ? "You chose " + (pick.agentName || pick.agentId) + "." : "";
+
+  const list = $("replies");
+  list.replaceChildren();
+  if (!view.replies || view.replies.length === 0) {
+    list.append(el("p", {}, "No replies yet."));
+    return;
+  }
+  // DOM order is the API's order, which is reply order
+  for (const r of view.replies) list.append(card(r, closed));
+}
+
+function card(r, closed) {
+  const name = r.agentName || r.agentId;
+  const headingId = "agent-" + r.leadId;
+  const status = el("p", { class: "status", role: "status" });
+  const box = el("article", { class: "reply", "aria-labelledby": headingId },
+    el("h2", { id: headingId }, name),
+    el("p", {}, el("strong", {}, "Range: " + money(r.range && r.range.low) + " to " + money(r.range && r.range.high))),
+    el("p", { class: "message" }, r.message || ""),
+    el("p", { class: "muted" }, "Replied " + (r.repliedAt ? when.format(new Date(r.repliedAt)) : "")),
+    r.evidence ? evidence(r.evidence, name) : el("p", { class: "muted" }, "No evidence attached"));
+
+  const actions = el("div", { class: "actions", role: "group", "aria-label": "Actions for " + name });
+  const engagements = [["I viewed this", "VIEWED"], ["Contact", "CONTACTED"], ["Request a visit", "VISIT_REQUESTED"]];
+  for (const [label, action] of engagements) {
+    const b = el("button", { type: "button", "aria-label": label + ": " + name }, label);
+    b.addEventListener("click", () => engage(r.leadId, action, label, status));
+    actions.append(b);
+  }
+  const choose = el("button", { type: "button", class: "choose", "aria-label": "Choose this agent: " + name },
+    "Choose this agent");
+  choose.disabled = closed;
+  choose.addEventListener("click", () => select(r.leadId));
+  actions.append(choose);
+  box.append(actions, status);
+  return box;
+}
+
+function evidence(pack, name) {
+  const wrap = el("div", {});
+  wrap.append(el("h3", {}, "Evidence"));
+  const cr = pack.comparablesRange;
+  if (cr) {
+    wrap.append(el("p", {}, "Comparables range: " + money(cr.low) + " / " + money(cr.mid) + " / " + money(cr.high)));
+  } else if (pack.rangeNote) {
+    wrap.append(el("p", {}, pack.rangeNote));
+  }
+  if (pack.method) wrap.append(el("p", { class: "muted" }, "Method: " + pack.method));
+  if (pack.dataVintage) wrap.append(el("p", { class: "muted" }, "Data: " + pack.dataVintage));
+
+  const comps = pack.comparables || [];
+  if (comps.length > 0) {
+    const head = el("tr", {},
+      el("th", { scope: "col" }, "Date"),
+      el("th", { scope: "col", class: "num" }, "Price"),
+      el("th", { scope: "col", class: "num" }, "Distance (m)"),
+      el("th", { scope: "col", class: "num" }, "Floor area"),
+      el("th", { scope: "col" }, "Energy rating"),
+      el("th", { scope: "col" }, "Type"));
+    const body = el("tbody", {});
+    for (const c of comps) {
+      const type = (c.propertyType || "") + (c.builtForm ? ", " + c.builtForm : "");
+      body.append(el("tr", {},
+        el("td", {}, c.date || ""),
+        el("td", { class: "num" }, money(c.price)),
+        el("td", { class: "num" }, c.distanceM ?? ""),
+        el("td", { class: "num" }, c.floorAreaM2 != null ? c.floorAreaM2 + " m²" : "not available"),
+        el("td", {}, c[ENERGY_KEY] || "not available"),
+        el("td", {}, type)));
+    }
+    wrap.append(el("table", {},
+      el("caption", { class: "muted" }, "Past sales attached by " + name),
+      el("thead", {}, head), body));
+  } else {
+    wrap.append(el("p", { class: "muted" }, "No past sales in this pack."));
+  }
+  const attributions = pack.provenance && pack.provenance.attributions;
+  if (attributions && attributions.length) {
+    for (const a of attributions) wrap.append(el("p", { class: "muted" }, a));
+  }
+  return wrap;
+}
+
+async function engage(leadId, action, label, status) {
+  showError("");
+  try {
+    await call("POST", base() + "/engagement", { leadId, action });
+    status.textContent = "Noted: " + label + ".";
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+async function select(leadId) {
+  showError("");
+  for (const b of document.querySelectorAll("button.choose")) b.disabled = true;
+  try {
+    const result = await call("POST", base() + "/selection", { leadId });
+    chosenLeadId = result && result.selectedLeadId ? result.selectedLeadId : leadId;
+    await load();   // the request is now closed, so every "Choose this agent" button renders disabled
+  } catch (e) {
+    await load();   // show the current state, then the API's reason
+    showError(e.message);
+  }
+}
+
+$("lookup").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  requestId = $("requestId").value.trim();
+  chosenLeadId = null;
+  const url = new URL(window.location.href);
+  url.searchParams.set("requestId", requestId);
+  history.replaceState(null, "", url);
+  load();
+});
+
+requestId = (new URLSearchParams(window.location.search).get("requestId") || "").trim();
+$("requestId").value = requestId;
+load();
+</script>
+</body>
+</html>
