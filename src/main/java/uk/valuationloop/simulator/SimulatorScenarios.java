@@ -186,11 +186,17 @@ public class SimulatorScenarios {
             throw new ScenarioFailed(scenario + ": the pack for " + property.postcode() + " has only " + comps.size()
                     + " comparables; is the comparables index loaded (make load)?");
         }
-        String dropped = comps.get(comps.size() - 1).ppdTransactionId();   // the lowest-ranked one
+        String dropped = comparableToExclude(comps, property.saleId());
+        if (dropped.equals(property.saleId())) {
+            log.info("scenario {}: agent removed the subject's own sale from the pack (demo artefact): {}", scenario, dropped);
+        }
         AgentPackView curated = evidence.exclude(evidencedAgent, evidencedLead, built.packId(), dropped);
         ComparablesRange range = curated.pack().comparablesRange();
+        boolean subjectInPack = property.saleId() != null && curated.pack().comparables().stream()
+                .anyMatch(c -> c.ppdTransactionId().equals(property.saleId()));
         checks.put("pack comparables (built, after curation)", comps.size() + " -> " + curated.pack().comparables().size());
-        checks.put("comparable excluded by the agent", dropped);
+        checks.put("comparable excluded by the agent", dropped.equals(property.saleId())
+                ? dropped + " (the subject's own sale, removed by the agent: demo artefact)" : dropped);
 
         double mid = range.mid();
         reply(highAgent, highLead, pounds(mid * 1.12), pounds(mid * 1.25), "Strong buyer demand on this street right now.");
@@ -216,9 +222,13 @@ public class SimulatorScenarios {
         ScorecardFact fact = awaitFact(evidencedLead, "the scorecard fact shows the instruction",
                 f -> f.isInstructed() && f.isSellerSelected() && f.isVisitBooked() && f.isEvidenceAttached());
         if (scenario.equals("ok")) {
-            fact = completionStep(evidencedLead, property, fact, checks);
+            fact = completionStep(evidencedLead, property, subjectInPack, fact, checks);
         }
-        checks.put("scorecard fact of the selected lead", factExcerpt(fact));
+        Map<String, Object> excerpt = factExcerpt(fact);
+        if (subjectInPack) {
+            excerpt.put("priceGapPct", "withheld");
+        }
+        checks.put("scorecard fact of the selected lead", excerpt);
         return report(scenario, proves, requestId, checks, evidencedAgent, started);
     }
 
@@ -342,7 +352,8 @@ public class SimulatorScenarios {
      * discovery. No match is a normal outcome (Land Registry publishes weeks after a completion), reported as
      * completed=false.
      */
-    private ScorecardFact completionStep(String leadId, Property property, ScorecardFact fact, Map<String, Object> checks) {
+    private ScorecardFact completionStep(String leadId, Property property, boolean subjectInPack, ScorecardFact fact,
+                                         Map<String, Object> checks) {
         var scan = completions.scanOnce();
         CompletionMatch match = completionMatches.findById(leadId).orElse(null);
         if (match == null) {
@@ -356,10 +367,25 @@ public class SimulatorScenarios {
         String kind = match.getPpdTransactionId().equals(property.saleId())
                 ? "demo: self-match, see completion/package-info"
                 : "demo: another sale at the same postcode, keyed on postcode+type+date, see completion/package-info";
-        checks.put("Land Registry late match", "completed=true, priceGapPct=" + joined.getPriceGapPct().toPlainString()
+        // a range built partly from the subject's own sale price says nothing about how close the reply was to it
+        String gap = subjectInPack ? "priceGapPct withheld (the pack still contains the subject's own sale)"
+                : "priceGapPct=" + joined.getPriceGapPct().toPlainString();
+        checks.put("Land Registry late match", "completed=true, " + gap
                 + " (" + kind + "; " + match.getPpdTransactionId() + ", GBP " + match.getCompletedPrice().toPlainString()
                 + " on " + match.getCompletedAt() + ")");
         return joined;
+    }
+
+    /**
+     * Which comparable the simulated agent removes when it curates the pack. The ok request is itself a real PPD sale
+     * (okProperty), so the pack query at that postcode can return that very sale as a comparable: a demo artefact,
+     * since in production the subject has not sold yet and the builder cannot know its transaction id. A pack that
+     * held it would pull the range towards the completed price and make the price gap meaningless, so the agent
+     * removes it. Otherwise the agent removes the lowest-ranked comparable (the last one), to show curation.
+     */
+    static String comparableToExclude(List<Comparable> comps, String subjectSaleId) {
+        return comps.stream().map(Comparable::ppdTransactionId).filter(id -> id.equals(subjectSaleId)).findFirst()
+                .orElse(comps.get(comps.size() - 1).ppdTransactionId());
     }
 
     /** What a scenario's request asks about. saleId: the PPD sale it was taken from (ok scenario), else null. */
