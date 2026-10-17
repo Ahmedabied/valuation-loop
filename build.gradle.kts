@@ -42,7 +42,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testRuntimeOnly("com.h2database:h2") // tests run without Postgres: H2 in PostgreSQL mode, same Flyway migrations
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testImplementation("com.networknt:json-schema-validator:1.5.9") // validates every event envelope against src/main/resources/events/*.schema.json
+    testImplementation("com.networknt:json-schema-validator:3.0.8") // validates every event envelope against src/main/resources/events/*.schema.json
 }
 
 tasks.withType<Test> {
