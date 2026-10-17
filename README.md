@@ -20,7 +20,7 @@ The design is in [docs/RFC-001-valuation-loop.md](docs/RFC-001-valuation-loop.md
 | 2 | Every reply can carry an evidence pack built to one standard from real public data, chosen and curated by the agent, machine-readable, with provenance. | `evidence/ComparablesQueryTest.missingFloorAreaGetsHalfWeightInTheSameQuery`, `evidence/ComparablesRankingEsTest.floorAreaMatchRanksAboveMissingFloorArea` and `packFromLiveEsHasProvenanceAndAttachEmitsASchemaValidEvent` (live Elasticsearch) |
 | 3 | The seller's choice, the visit and the instruction join back to the lead even when late and out of order, and one replayable query answers "do evidenced answers win the seller, and at what price gap?". | `scorecard/ScorecardReplayTest.outOfOrderLateAndDuplicateEventsProjectDeterministicallyAndReplayRebuildsIdenticalFacts`, `scorecard/ProductQueryTest.sharesCapturedByTheHighestRangeReplySplitByEvidence` |
 
-All test paths are under `src/test/java/uk/valuationloop/`. There are 147 tests; the two live-Elasticsearch ones run
+All test paths are under `src/test/java/uk/valuationloop/`. There are 149 tests; the two live-Elasticsearch ones run
 only with `make test-es` (`./gradlew test -Pes=true`).
 
 ## The real number
@@ -106,12 +106,12 @@ Gradle comes from the wrapper (`./gradlew`, Gradle 8.14.3).
 ### Steps
 
 ```
-make test            # 147 tests: 145 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
+make test            # 149 tests: 147 run, the 2 live-Elasticsearch ones skip; H2 + @EmbeddedKafka, no services
 make services-up     # Postgres on 5433, Kafka on 9092, Elasticsearch on 9200 (make status to check)
 make test-es         # the same plus the two live-Elasticsearch tests (needs Elasticsearch up)
 make load            # load Wandsworth + Lambeth into Elasticsearch (about 23 s; make demo runs it if the index is missing)
 make stats           # print the range-width statistic above
-make run             # the app on 127.0.0.1:8080 (actuator on 127.0.0.1:8081), profiles local,demo
+make run             # the app on 127.0.0.1:8080 (actuator on 127.0.0.1:8081), profiles local,demo (demo adds the simulator and internal routes)
 make demo            # starts the app from the jar, runs every scenario, prints the report, stops the app (not with make run up)
 make replay          # after make demo, app stopped: truncate scorecard_fact, reset offsets, rebuild, compare, exit 0/1
 make demo-split      # the same jar as two processes: api on 8080 (actuator 8081), worker on 8090 (actuator 8091)
@@ -144,6 +144,7 @@ selection. `make page ID=<requestId>` prints the URL; `docs/DEMO.md` says how to
 ### CI and licence
 
 [![CI](https://github.com/Ahmedabied/valuation-loop/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmedabied/valuation-loop/actions/workflows/ci.yml)
+<!-- repo not public yet; badge activates after the first push -->
 
 `.github/workflows/ci.yml` runs on every push and pull request. Job `test`: JDK 21 (Temurin), `./gradlew test` on H2
 and embedded Kafka, no services. Job `test-es` (after `test`): an Elasticsearch 8.19.4 service container, then
@@ -187,6 +188,10 @@ agent and every query is scoped to it, so another agent's lead is a 404. Errors 
 | 15 | `GET /agents/{agentId}/scorecard` | The agent's own numbers next to a labelled fixture benchmark |
 | 16 | `GET /scorecard/product-query` | The product query. Exists only under the `demo` and `test` profiles |
 | 17 | `GET /scorecard/snapshot` | Every scorecard fact, for the replay diff. Exists only under the `demo` and `test` profiles |
+
+Demo-only routes, not part of the product API (`@Profile`, absent from a build run without `demo`): `POST /simulator/scenarios/{name}`
+and `POST /simulator/outbox-gap` (`demo`), `POST /completions/scan` (`demo`, `test`) and
+`PUT|DELETE /internal/demo/delivery/flaky-failures`, `GET /internal/demo/delivery/dlt-records` (`demo`, used by the split run).
 
 ## Data and licences
 
