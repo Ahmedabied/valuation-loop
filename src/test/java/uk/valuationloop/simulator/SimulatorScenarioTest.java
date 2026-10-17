@@ -17,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import uk.valuationloop.completion.CompletedSales;
 import uk.valuationloop.evidence.ComparableDocument;
+import uk.valuationloop.evidence.ComparablesRange;
 import uk.valuationloop.evidence.FakeEvidenceSources;
 import uk.valuationloop.evidence.GeoPoint;
 import uk.valuationloop.evidence.PostcodeCentroids;
@@ -47,6 +48,7 @@ class SimulatorScenarioTest {
     static class FakeEs {
         @Bean @Primary FakeEvidenceSources.Search fakeSearch() {
             FakeEvidenceSources.Search search = new FakeEvidenceSources.Search();
+            search.results.add(SEED);   // the subject's own sale comes back first, as the real index ranks it at 0 m
             for (int i = 0; i < 8; i++) {   // eight fictional flats, 50 m apart, 560k..630k, all with a floor area
                 search.results.add(FakeEvidenceSources.sale("ppd-sim-" + i, 560_000 + 10_000L * i, 66.0 + i, 50.0 * i));
             }
@@ -93,7 +95,11 @@ class SimulatorScenarioTest {
                 .findFirst().orElseThrow();
         assertThat(selected.agentId()).isEqualTo(SimulatorScenarios.AGENT_OK_2);
         assertThat(selected.evidenceAttached()).isTrue();
-        assertThat(selected.comparablesCount()).isEqualTo(7);   // 8 built, 1 excluded by the agent
+        assertThat(selected.comparablesCount()).isEqualTo(8);   // 9 built, the subject's own sale excluded by the agent
+        assertThat(report.checks().get("comparable excluded by the agent").toString())
+                .isEqualTo("ppd-sim-seed (the subject's own sale, removed by the agent: demo artefact)");
+        // the range comes from the eight fictional flats alone (560k..630k), not from the subject's own 612k
+        assertThat(selected.comparablesRange()).isEqualTo(new ComparablesRange(577_500, 595_000, 612_500));
         assertThat(selected.state()).isEqualTo("VISIT_BOOKED");
         assertThat(report.instructedLeadId()).isEqualTo(report.sellerSelectedLeadId());
         assertThat(report.requestState()).isEqualTo("CLOSED");
