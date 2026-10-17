@@ -1,6 +1,8 @@
 package uk.valuationloop.evidence;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.HealthStatus;
+import co.elastic.clients.elasticsearch.cluster.HealthResponse;
 import co.elastic.clients.json.JsonpMapper;
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import co.elastic.clients.transport.ElasticsearchTransport;
@@ -14,6 +16,8 @@ import org.elasticsearch.client.RestClient;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -64,5 +68,25 @@ public class EsConfig {
     @Bean
     public ElasticsearchClient elasticsearchClient(ElasticsearchTransport transport) {
         return new ElasticsearchClient(transport);
+    }
+
+    /**
+     * /actuator/health includes "elasticsearch", as it did on Boot 3 (whose auto-configuration added it for the
+     * low-level RestClient; Boot 4 only does so for the 9.x Rest5Client). Red cluster: OUT_OF_SERVICE; unreachable: DOWN.
+     */
+    @Bean
+    public HealthIndicator elasticsearchHealthIndicator(ElasticsearchClient client) {
+        return () -> {
+            try {
+                HealthResponse health = client.cluster().health();
+                Health.Builder status = health.status() == HealthStatus.Red ? Health.outOfService() : Health.up();
+                return status.withDetail("clusterName", health.clusterName())
+                        .withDetail("status", health.status().jsonValue())
+                        .withDetail("numberOfNodes", health.numberOfNodes())
+                        .build();
+            } catch (Exception e) {
+                return Health.down(e).build();
+            }
+        };
     }
 }
