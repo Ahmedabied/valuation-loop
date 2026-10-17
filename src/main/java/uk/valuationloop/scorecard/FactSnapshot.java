@@ -24,6 +24,9 @@ public record FactSnapshot(
         boolean sellerSelected,
         boolean visitBooked,
         boolean instructed,
+        Long completedPrice,
+        String completedAt,
+        String priceGapPct,
         String lastEventAt) {
 
     public static FactSnapshot of(ScorecardFact f) {
@@ -31,7 +34,10 @@ public record FactSnapshot(
                 text(f.getRepliedAt()), f.getReplyMinutes(), f.getWithinDeadline(), f.isEvidenceAttached(),
                 whole(f.getRangeLow()), whole(f.getRangeHigh()),
                 f.getRangeRank() == null ? null : f.getRangeRank().name(),
-                f.isSellerEngaged(), f.isSellerSelected(), f.isVisitBooked(), f.isInstructed(), text(f.getLastEventAt()));
+                f.isSellerEngaged(), f.isSellerSelected(), f.isVisitBooked(), f.isInstructed(), whole(f.getCompletedPrice()),
+                f.getCompletedAt() == null ? null : f.getCompletedAt().toString(),
+                f.getPriceGapPct() == null ? null : f.getPriceGapPct().toPlainString(),   // text: "2.12" == "2.12" whatever the scale bookkeeping
+                text(f.getLastEventAt()));
     }
 
     private static String text(Instant t) {
