@@ -244,7 +244,8 @@ Model answers are short on purpose. Rewrite each in your own words before the in
    request's leads spread over partitions and listener threads, and keeps every copy of one lead's command in order.
    Events are per request: the scorecard needs them in order for a request. v1 had one partition and one listener
    thread, so a slow CRM delayed the leads behind it; phase 2 added 6 partitions, 3 threads and a 5 s per-call timeout
-   (question 21), and the `slow` scenario now shows the ok leads delivered first.
+   (question 21). The `slow` scenario shows the ok leads on the other two threads delivered first; an ok lead keyed
+   onto the slow lead's thread still waits, and the report counts it.
 6. **Why no ranking of agents?** Agents are the paying customers, and a platform verdict on a named agent built on this
    data is a claim nothing could back. Technically, comparables disagree by a median 28% of value, so a 5 to 10%
    difference between two agents is noise. Eligibility is a lookup; the seller sees evidence in reply order.

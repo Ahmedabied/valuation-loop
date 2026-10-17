@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -285,26 +286,26 @@ public class SimulatorScenarios {
 
     /**
      * The slow scenario's own evidence: each lead's lead.deliver.v1 partition (computed as the producer does, from the
-     * leadId) next to its delivery time, and whether the ok leads were delivered before the slow one finished. Two
-     * leads on partitions owned by the same consumer thread would still queue; the line shows it when that happens.
+     * leadId), the listener thread (group member) the broker says owns it, and its delivery time; then the verdict of
+     * SlowLaneCheck. Each of the 3 threads owns 2 of the 6 partitions, so an ok lead keyed onto the slow lead's thread
+     * still queues behind it, by design; the check counts those and requires every other ok lead to finish first.
      */
     private void slowChecks(List<AgentLead> ls, Map<String, Object> checks) {
         int partitions = delivery.deliverPartitions();
-        Map<String, String> perLead = new LinkedHashMap<>();
-        long slowMs = 0;
-        long okMaxMs = 0;
+        Map<Integer, String> owners = delivery.deliveryOwners();
+        List<String> perLead = new ArrayList<>();
+        List<SlowLaneCheck.Timing> timings = new ArrayList<>();
         for (AgentLead l : ls) {
             long ms = Duration.between(l.getCreatedAt(), l.getDeliveredAt()).toMillis();
             String adapter = directory.byId(l.getAgentId()).map(AgentDirectory.Agent::adapter).orElse("?");
-            perLead.put(l.getAgentId(), adapter + " p" + DeliveryControl.partitionOf(l.getId(), partitions) + " " + ms + " ms");
-            if (adapter.equals("slow")) {
-                slowMs = ms;
-            } else {
-                okMaxMs = Math.max(okMaxMs, ms);
-            }
+            int p = DeliveryControl.partitionOf(l.getId(), partitions);
+            perLead.add(adapter + " p" + p + " " + owners.getOrDefault(p, "?") + " " + ms + " ms");
+            timings.add(new SlowLaneCheck.Timing(adapter, p, ms));
         }
-        checks.put("lead.deliver.v1 partition, delivery (of " + partitions + ")", List.copyOf(perLead.values()));
-        checks.put("ok leads delivered before the slow one", okMaxMs < slowMs);
+        SlowLaneCheck.Result r = SlowLaneCheck.evaluate(timings, owners);
+        checks.put("lead.deliver.v1 partition, thread, delivery (of " + partitions + ")", List.copyOf(perLead));
+        checks.put("ok leads on other threads delivered before the slow one", r.otherThreadsFirst()
+                + " (" + r.otherThreads() + " on other threads, " + r.sameThread() + " sharing the slow lead's thread)");
     }
 
     /**
