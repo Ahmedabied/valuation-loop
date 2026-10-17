@@ -200,7 +200,7 @@ perfect match. Put the weight back and `NO-AREA` is always second.
 - **MockMvc vs the Django test client.** `mvc.perform(post("/valuation-requests").content(...))
   .andExpect(status().isCreated())` drives the whole Spring MVC stack in process without a port, like
   `self.client.post(...)` and `assertEqual(response.status_code, 201)`.
-- **`@EmbeddedKafka(kraft = true)`.** Starts a real Kafka broker inside the test JVM, no Docker, and points
+- **`@EmbeddedKafka`.** Starts a real Kafka broker (KRaft, the only mode since spring-kafka 4) inside the test JVM, no Docker, and points
   `spring.kafka.bootstrap-servers` at it. Tests that share the same annotations share one Spring context and broker,
   which keeps the suite fast.
 - **`function_score` decay.** A gauss decay turns a distance from an origin into a score: 1 at the origin, 0.5 at
@@ -279,14 +279,21 @@ Model answers are short on purpose. Rewrite each in your own words before the in
     which also proves which agent's CRM sent it, so it can only record outcomes for that agent's leads.
 15. **Why 423 for the contact?** The agent is allowed to see the contact, just not yet. 403 would say "never"; 423
     Locked says the resource is locked and the body says what unlocks it: reply first. It is the one public OAV rule.
-16. **Why Boot 3.5, and what does the upgrade touch?** The best-documented line for a first Spring project, with
-    spring-kafka 3.3 and the Elasticsearch 8 client. It left open-source support on 2026-06-30, so the bump to 4.1 is v2
-    day 1: version lines, Jackson 3 imports, spring-kafka 4.x, the Elasticsearch client line.
+16. **Why Boot 3.5 first, and what did the Boot 4.1 upgrade touch?** 3.5 was the best-documented line for a first
+    Spring project, but it left open-source support on 2026-06-30, so the upgrade to 4.1.1 was v2 day 1 (2026-10-17,
+    ADR 0005). It touched: the build (Boot 4 is modular, so Kafka, Flyway, MVC and each test slice come in through their
+    own starters); Jackson 3 (`com.fasterxml.jackson` -> `tools.jackson`, unchecked `JacksonException`, `asText()` ->
+    `asString()`), checked by serialising the same envelopes on both versions and comparing the bytes: identical;
+    spring-kafka 4.1 (`@RetryableTopic` takes spring-kafka's own `@BackOff` because retry moved from Spring Retry
+    into Spring Framework; `@EmbeddedKafka` is KRaft-only); moved test-slice packages; and Elasticsearch: Boot 4.1
+    wants the 9.x client, which does not support our 8.19 server, so the 8.18 client stays with its own small Jackson
+    2 mapper, and the ES health check Boot 3 gave for free is now declared in `EsConfig`. No test was changed in what it
+    asserts; the 146 tests stayed green and one tracing test was added.
 17. **How do retries avoid blocking other leads?** Non-blocking retry topics: a failed record is re-published to
     `-retry-0` with a delay and the main partition moves on. Lock conflicts are retried in process and never reach the
     retry topics. What they do not fix is a slow call: it holds its listener thread while it runs, for at most the 5 s timeout, and
     the other two threads carry on (questions 5 and 21).
-18. **How do you test Kafka without Docker?** `@EmbeddedKafka(kraft = true)` runs a broker in the test JVM; H2 in
+18. **How do you test Kafka without Docker?** `@EmbeddedKafka` (KRaft) runs a broker in the test JVM; H2 in
     PostgreSQL mode runs the same Flyway migrations. The two Elasticsearch tests need a real node and run with
     `-Pes=true`.
 19. **What if Elasticsearch is down?** Building a pack returns 503 with the standard error body. Requests, delivery,
