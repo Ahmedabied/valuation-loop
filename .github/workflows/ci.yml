@@ -25,6 +25,8 @@ jobs:
           java-version: "21"
           cache: gradle
       - name: Test
+        env:
+          JDK21_HOME: ${{ env.JAVA_HOME }}   # the toolchain gradle.properties looks for (setup-java sets JAVA_HOME)
         run: ./gradlew test --no-daemon
       - name: Upload test reports
         if: failure()
@@ -71,6 +73,8 @@ jobs:
           echo "elasticsearch did not come up" >&2
           exit 1
       - name: Test (including the live-Elasticsearch tests)
+        env:
+          JDK21_HOME: ${{ env.JAVA_HOME }}
         run: ./gradlew test -Pes=true --no-daemon
       - name: Upload test reports
         if: failure()
