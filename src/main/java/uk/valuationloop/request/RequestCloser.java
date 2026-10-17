@@ -15,9 +15,12 @@ import uk.valuationloop.outbox.Topics;
 import uk.valuationloop.request.RequestTransitions.RequestEvent;
 
 /**
- * Closes a request once none of its leads can change any more (each is REPLIED, EVIDENCED, VISIT_BOOKED, EXPIRED
- * or DELIVERY_FAILED), and emits RequestClosed {reason} on valuation.requested.v1 in the same transaction.
- * Closing on the seller's selection is the comparison module's job, not this class's.
+ * Closes a request once nothing can ever come back to the seller: every lead is terminal for delivery (REPLIED,
+ * EVIDENCED, VISIT_BOOKED, EXPIRED or DELIVERY_FAILED) AND no lead has replied. It emits RequestClosed {reason} on
+ * valuation.requested.v1 in the same transaction.
+ *
+ * If any agent replied, the request stays REPLIES_IN: the seller still has a reply to compare and choose from, and
+ * closing on the seller's selection is the comparison module's job, not this class's.
  */
 @Component
 public class RequestCloser {
@@ -36,7 +39,7 @@ public class RequestCloser {
         this.clock = clock;
     }
 
-    /** Returns true when this call closed the request; false when it was already closed or a lead is still open. */
+    /** Returns true when this call closed the request; false when it was already closed, a lead is still open, or a lead replied. */
     @Transactional
     public boolean closeIfAllLeadsTerminal(String requestId, String reason) {
         ValuationRequest request = requests.findById(requestId).orElse(null);
@@ -50,6 +53,9 @@ public class RequestCloser {
         List<AgentLead> all = leads.findByRequestIdOrderByCreatedAt(requestId);
         if (all.isEmpty() || !all.stream().allMatch(l -> LeadTransitions.isTerminalForDelivery(l.getState()))) {
             return false;
+        }
+        if (all.stream().anyMatch(AgentLead::hasReplied)) {
+            return false;   // a reply is waiting for the seller; the seller's selection closes this request
         }
         request.apply(new RequestEvent.AllLeadsTerminal(), clock.instant());
         outbox.write(Topics.VALUATION_REQUESTED, requestId, EventEnvelope.of(EventTypes.REQUEST_CLOSED,
