@@ -30,8 +30,11 @@ import uk.valuationloop.outbox.Topics;
  * </pre>
  *
  * "Non-blocking": a failing record is re-published to the next topic and the partition moves on, so a flaky CRM's
- * waits between attempts never hold up the leads behind it. (A slow call still does while it runs: see SlowAdapter.)
- * spring-kafka creates the extra topics and listeners from the annotation.
+ * waits between attempts never hold up the leads behind it. A slow call holds only its own consumer thread: the
+ * topics have 6 partitions (DeliveryTopics) read by 3 threads (concurrency), each lead goes to the partition its
+ * leadId hashes to, and AdapterCaller cuts a call off at valuationloop.delivery.adapter-timeout-ms. spring-kafka creates
+ * the retry/DLT listeners from the annotation (the retry containers inherit the concurrency); the topics themselves
+ * come from DeliveryTopics.
  *
  * Shape (H2-review E2-5): this method is NOT @Transactional. It calls the service (which commits its own
  * transactions through Spring's proxy) and returns; the container then commits the offset (ack-mode: record).
@@ -64,11 +67,13 @@ public class LeadDeliveryListener {
             dltTopicSuffix = "-dlt",
             dltStrategy = DltStrategy.FAIL_ON_ERROR,                 // if the DLT handler itself fails: log, do not loop
             exclude = {MalformedCommand.class, AdapterRegistry.UnknownAdapter.class}, // cannot heal: straight to the DLT
-            kafkaTemplate = "kafkaTemplate")                         // Boot's template publishes to the retry/DLT topics
+            kafkaTemplate = "kafkaTemplate",                         // Boot's template publishes to the retry/DLT topics
+            autoCreateTopics = "false")                              // DeliveryTopics declares all four (6 partitions)
     @KafkaListener(
             id = "lead-delivery",
             topics = Topics.LEAD_DELIVER,
             groupId = "delivery",
+            concurrency = "${valuationloop.delivery.concurrency:3}", // 3 consumer threads, 2 of the 6 partitions each
             autoStartup = "${valuationloop.delivery.listener.auto-startup:true}")
     public void onDeliverLead(String envelopeJson) {
         EventEnvelope envelope = parse(envelopeJson);
