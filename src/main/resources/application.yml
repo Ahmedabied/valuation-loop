@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: valuation-loop
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5433/valuation_loop
+    username: postgres
+    password: ${PG_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # Flyway owns the schema; Hibernate only checks it matches the entities
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: 127.0.0.1:9092
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: record             # the offset is committed after the listener method returns without throwing
+  threads:
+    virtual:
+      enabled: true                # Java 21 virtual threads for request handling
+
+valuationloop:
+  outbox:
+    enabled: true
+    relay-delay-ms: 300
+    batch-size: 100
+  reply-window-hours: 24           # OAV: "reply by end of next working day" (simplified to 24h in v1)
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    uk.valuationloop: INFO
+    org.apache.kafka: WARN
