@@ -7,7 +7,9 @@ import uk.valuationloop.observability.EventTracing;
 
 /**
  * The JSON envelope every event travels in (ARCHITECTURE.md §4).
- * eventId is the idempotency key; consumers that cannot upsert by a natural key dedupe on it.
+ * eventId is the identity of one event (and the key schema validation reports against). Consumers do not dedupe on
+ * it: each is idempotent by a natural key (lead state, the scorecard upsert by lead_id, instructed_at, the
+ * completion_match primary key), so there is no dedupe table (docs/EVENTS.md, "Idempotency rule").
  * The envelope is the whole Kafka value, serialised as a JSON string; no type headers, no framework magic.
  */
 public record EventEnvelope(
