@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RequestClosed",
+  "description": "The request is closed. Topic valuation.requested.v1, key requestId. Full envelope, schemaVersion 1 (see docs/EVENTS.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "occurredAt",
+    "requestId",
+    "leadId",
+    "agentId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "uuidv7; the idempotency key"
+    },
+    "eventType": {
+      "const": "RequestClosed"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^vr_"
+    },
+    "leadId": {
+      "type": "null"
+    },
+    "agentId": {
+      "type": "null"
+    },
+    "traceparent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "W3C trace context; null when no span is active"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "enum": [
+            "SELLER_SELECTED",
+            "ALL_LEADS_TERMINAL"
+          ]
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeliverLead",
+  "description": "Command to the delivery worker: send this lead to the agent's CRM adapter. Topic lead.deliver.v1, key leadId. Full envelope, schemaVersion 1 (see docs/EVENTS.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "occurredAt",
+    "requestId",
+    "leadId",
+    "agentId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "uuidv7; the idempotency key"
+    },
+    "eventType": {
+      "const": "DeliverLead"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^vr_"
+    },
+    "leadId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^ld_"
+    },
+    "agentId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^ag_"
+    },
+    "traceparent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "W3C trace context; null when no span is active"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "enum": [
+            "ok",
+            "slow",
+            "flaky"
+          ]
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    }
+  }
+}

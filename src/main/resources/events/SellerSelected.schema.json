@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SellerSelected",
+  "description": "The seller chose this agent; the envelope's leadId is the choice. Topic lead.events.v1, key requestId. Full envelope, schemaVersion 1 (see docs/EVENTS.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "occurredAt",
+    "requestId",
+    "leadId",
+    "agentId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "uuidv7; the idempotency key"
+    },
+    "eventType": {
+      "const": "SellerSelected"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^vr_"
+    },
+    "leadId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^ld_"
+    },
+    "agentId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^ag_"
+    },
+    "traceparent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "W3C trace context; null when no span is active"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {},
+      "required": []
+    }
+  }
+}
