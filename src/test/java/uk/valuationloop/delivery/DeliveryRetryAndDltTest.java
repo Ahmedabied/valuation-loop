@@ -24,9 +24,9 @@ import uk.valuationloop.support.EventSchemas;
  */
 class DeliveryRetryAndDltTest extends DeliveryIntegrationTestBase {
 
-    static final String DLT = Topics.LEAD_DELIVER + "-dlt";
-    static final String RETRY_0 = Topics.LEAD_DELIVER + "-retry-0";
-    static final String RETRY_1 = Topics.LEAD_DELIVER + "-retry-1";
+    static final String DLT = Topics.LEAD_DELIVER_DLT;
+    static final String RETRY_0 = Topics.LEAD_DELIVER_RETRY_0;
+    static final String RETRY_1 = Topics.LEAD_DELIVER_RETRY_1;
 
     static final String FLAKY_AGENT = "ag_fictional_03";
 
