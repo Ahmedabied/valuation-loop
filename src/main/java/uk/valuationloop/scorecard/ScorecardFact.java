@@ -7,11 +7,13 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
- * One row per lead in the scorecard read model (V3__scorecard_fact.sql). Built only from events, so it can be thrown
+ * One row per lead in the scorecard read model (V3__scorecard_fact.sql, plus the completion columns of V5). Built only from events, so it can be thrown
  * away and rebuilt from the topics at any time.
  *
  * Every method below is written so that the final row does not depend on the order events arrive in, and applying
@@ -19,7 +21,7 @@ import java.time.Instant;
  * <ul>
  *   <li>flags (evidence, engaged, selected, visit, instructed) only ever go from false to true;</li>
  *   <li>timestamps keep the earliest value seen, and last_event_at the latest;</li>
- *   <li>derived fields (reply_minutes) are recomputed from the stored inputs after every event.</li>
+ *   <li>derived fields (reply_minutes, price_gap_pct) are recomputed from the stored inputs after every event.</li>
  * </ul>
  */
 @Entity
@@ -72,6 +74,15 @@ public class ScorecardFact {
 
     @Column(nullable = false)
     private boolean instructed;
+
+    @Column(name = "completed_price")
+    private BigDecimal completedPrice;   // from CompletionMatched: the Land Registry price paid
+
+    @Column(name = "completed_at")
+    private LocalDate completedAt;       // the PPD date of transfer
+
+    @Column(name = "price_gap_pct")
+    private BigDecimal priceGapPct;      // derived: completed price vs the replied range's midpoint, in percent
 
     @Column(name = "last_event_at", nullable = false)
     private Instant lastEventAt;
@@ -133,15 +144,47 @@ public class ScorecardFact {
 
     void rank(RangeRank rank) { this.rangeRank = rank; }
 
+    /**
+     * CompletionMatched: the sale Land Registry recorded for this lead. A lead has one completion; should two ever
+     * arrive, the earlier transfer wins (then the lower price), so the row is the same whichever came first.
+     */
+    void completed(BigDecimal price, LocalDate transferDate) {
+        boolean replace = completedAt == null
+                || transferDate.isBefore(completedAt)
+                || (transferDate.isEqual(completedAt) && price.compareTo(completedPrice) < 0);
+        if (replace) {
+            completedPrice = price;
+            completedAt = transferDate;
+        }
+    }
+
     /** Called after every event: derived fields and the bookkeeping columns. */
     void touched(Instant occurredAt, Instant now) {
         replyMinutes = (deliveredAt == null || repliedAt == null)
                 ? null
                 : (int) Math.max(0, Duration.between(deliveredAt, repliedAt).toMinutes());
+        priceGapPct = priceGapPct(completedPrice, rangeLow, rangeHigh);
         if (occurredAt.isAfter(lastEventAt)) {
             lastEventAt = occurredAt;
         }
         updatedAt = now;
+    }
+
+    /**
+     * (completed - midpoint) / midpoint * 100, rounded half-up to two decimals; null unless there is both a completion
+     * and a replied range. Written with low + high (twice the midpoint) so no intermediate value is rounded:
+     * (2 * completed - (low + high)) * 100 / (low + high). Negative: the sale completed below the range's midpoint.
+     */
+    static BigDecimal priceGapPct(BigDecimal completed, BigDecimal low, BigDecimal high) {
+        if (completed == null || low == null || high == null) {
+            return null;
+        }
+        BigDecimal twiceMid = low.add(high);
+        if (twiceMid.signum() == 0) {
+            return null;
+        }
+        return completed.multiply(BigDecimal.TWO).subtract(twiceMid).multiply(BigDecimal.valueOf(100))
+                .divide(twiceMid, 2, RoundingMode.HALF_UP);
     }
 
     boolean hasRange() {
@@ -163,6 +206,9 @@ public class ScorecardFact {
     public boolean isSellerSelected() { return sellerSelected; }
     public boolean isVisitBooked() { return visitBooked; }
     public boolean isInstructed() { return instructed; }
+    public BigDecimal getCompletedPrice() { return completedPrice; }
+    public LocalDate getCompletedAt() { return completedAt; }
+    public BigDecimal getPriceGapPct() { return priceGapPct; }
     public Instant getLastEventAt() { return lastEventAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
