@@ -15,6 +15,7 @@ import uk.valuationloop.agent.AgentDirectory.Agent;
 import uk.valuationloop.lead.AgentLead;
 import uk.valuationloop.lead.AgentLeadRepository;
 import uk.valuationloop.outbox.EventEnvelope;
+import uk.valuationloop.outbox.EventTypes;
 import uk.valuationloop.outbox.OutboxWriter;
 import uk.valuationloop.outbox.Topics;
 import uk.valuationloop.request.RequestTransitions.RequestEvent;
@@ -58,7 +59,7 @@ public class ValuationRequestService {
         // save() returns the managed copy: with an assigned id Spring Data merges rather than persists, so keep
         // the returned instance, or the state changes below land on a detached object and never reach the row
         request = requests.save(request);
-        outbox.write(Topics.VALUATION_REQUESTED, request.getId(), EventEnvelope.of("ValuationRequested",
+        outbox.write(Topics.VALUATION_REQUESTED, request.getId(), EventEnvelope.of(EventTypes.VALUATION_REQUESTED,
                 request.getId(), null, null, Map.of(
                         "postcode", request.getPostcode(),
                         "outcode", request.getOutcode(),
@@ -70,7 +71,7 @@ public class ValuationRequestService {
             throw new NoEligibleAgents(request.getOutcode());
         }
         request.apply(new RequestEvent.AgentsMatched(), now);
-        outbox.write(Topics.VALUATION_REQUESTED, request.getId(), EventEnvelope.of("AgentsMatched",
+        outbox.write(Topics.VALUATION_REQUESTED, request.getId(), EventEnvelope.of(EventTypes.AGENTS_MATCHED,
                 request.getId(), null, null, Map.of(
                         "agentIds", eligible.stream().map(Agent::id).toList(),
                         "eligibilityRule", cmd.selectedAgentIds() == null || cmd.selectedAgentIds().isEmpty()
@@ -78,11 +79,10 @@ public class ValuationRequestService {
 
         List<AgentLead> created = new ArrayList<>();
         for (Agent agent : eligible) {
-            AgentLead lead = AgentLead.create(request.getId(), agent.id(), now);
-            leads.save(lead);
+            AgentLead lead = leads.save(AgentLead.create(request.getId(), agent.id(), now));   // the managed copy, as above
             created.add(lead);
             // the command the delivery worker acts on; keyed by leadId so one slow agent never blocks another
-            outbox.write(Topics.LEAD_DELIVER, lead.getId(), EventEnvelope.of("DeliverLead",
+            outbox.write(Topics.LEAD_DELIVER, lead.getId(), EventEnvelope.of(EventTypes.DELIVER_LEAD,
                     request.getId(), lead.getId(), agent.id(), Map.of("adapter", agent.adapter())));
         }
         request.apply(new RequestEvent.LeadsDispatched(), now);
@@ -91,10 +91,14 @@ public class ValuationRequestService {
         return new Created(request, created);
     }
 
-    /** The seller's own choice wins; otherwise every slot holder for the outcode. No ordering by behaviour. */
+    /**
+     * The seller's own choice wins; otherwise every slot holder for the outcode. No ordering by behaviour.
+     * distinct(): an agent the seller listed twice still gets one lead (agent_lead is unique per request and agent).
+     */
     private List<Agent> eligibleAgents(String outcode, List<String> selectedAgentIds) {
         if (selectedAgentIds != null && !selectedAgentIds.isEmpty()) {
             return selectedAgentIds.stream()
+                    .distinct()
                     .map(id -> directory.byId(id).orElseThrow(() -> new IllegalArgumentException("unknown agent " + id)))
                     .toList();
         }
