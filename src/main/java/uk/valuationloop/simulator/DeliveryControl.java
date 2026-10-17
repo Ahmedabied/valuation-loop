@@ -3,6 +3,7 @@ package uk.valuationloop.simulator;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ConsumerGroupDescription;
@@ -87,6 +88,26 @@ public class DeliveryControl {
             return group.state() == ConsumerGroupState.STABLE && assigned == partitions;
         } catch (Exception e) {
             return false;   // broker busy or group not there yet: the caller polls again
+        }
+    }
+
+    /**
+     * Which member of group "delivery" (one per listener thread, named by its client id) owns each lead.deliver.v1
+     * partition right now, as the broker reports it. Empty if the broker cannot say; the slow check then treats every
+     * ok lead as on another thread, the strict reading.
+     */
+    public Map<Integer, String> deliveryOwners() {
+        try (AdminClient admin = AdminClient.create(kafkaAdmin.getConfigurationProperties())) {
+            ConsumerGroupDescription group = admin.describeConsumerGroups(List.of("delivery")).all()
+                    .get(5, TimeUnit.SECONDS).get("delivery");
+            Map<Integer, String> owners = new TreeMap<>();
+            for (MemberDescription m : group.members()) {
+                m.assignment().topicPartitions().stream().filter(tp -> tp.topic().equals(Topics.LEAD_DELIVER))
+                        .forEach(tp -> owners.put(tp.partition(), m.clientId()));
+            }
+            return owners;
+        } catch (Exception e) {
+            return Map.of();
         }
     }
 
