@@ -49,4 +49,7 @@ Jackson 2 mapper until the server moves to 9.x.
   When the server moves to ES 9, switch to `elasticsearch-java` 9.x, `Rest5Client` and drop Jackson 2.
 - Jackson 3 sorts properties alphabetically by default for plain classes. Every serialised type here is a record or
   a `Map`, which keep their order, so nothing changed; a future POJO on the wire should be checked.
+- Found on the way, not caused by the upgrade: `DuplicateDeliveryTest` waited on partition 0 only, so it failed on
+  its own (on Boot 3.5.16 too) whenever the lead hashed to another of the 6 partitions. It now waits on all of them;
+  its assertions are unchanged.
 - `JacksonException` is unchecked: the existing `catch` blocks still turn bad JSON into the same domain errors.
