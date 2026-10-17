@@ -14,7 +14,7 @@ PG_PORT    ?= 5433
 PG_DB      ?= valuation_loop
 LOGS       := $(HOME)/tools/logs
 
-.PHONY: help test test-es build jar run kafka-up kafka-down es-up es-down pg-up pg-down services-up services-down status load stats demo replay clean-daemons
+.PHONY: help test test-es build jar run kafka-up kafka-down es-up es-down pg-up pg-down services-up services-down status load stats demo replay clean-daemons page
 
 # pgrep/pkill -f match the full command line, and the shell make starts for a recipe has the pattern in ITS command
 # line too, so a plain pattern always finds that shell. "[k]afka" matches the text "kafka" but not the text "[k]afka".
@@ -142,3 +142,7 @@ run-split: jar
 # services up, both processes up, every scenario against the api, report + worker metrics, both stopped again
 demo-split: services-up jar
 	@$(SPLIT_ENV) scripts/split.sh demo
+
+# the seller side-by-side page (static, served by the app under every profile): make page ID=<requestId>
+page:
+	@echo "http://127.0.0.1:8080/comparison.html?requestId=$(or $(ID),<id>)"
