@@ -237,8 +237,8 @@ its own data policy, and the RFC records that as a gap.
 ## Built with AI pairing
 
 Built with AI pairing. I set the problem, the constraints and the acceptance tests for each claim; Claude (Anthropic)
-drafted most of the Java, the documentation and the review passes under my direction; I own every line and can defend
-it. Rightmove's application asks how candidates use AI; this repository is my answer.
+drafted most of the Java, the documentation and the review passes under my direction. I am studying every line until
+I can explain and change it.
 
 ## What it does not prove
 
