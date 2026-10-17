@@ -34,7 +34,11 @@ clean-daemons:
 kafka-up:
 	@mkdir -p $(KAFKA_DATA) $(LOGS)
 	@if [ ! -f $(KAFKA_DATA)/meta.properties ]; then \
-	  sed -e 's#^log.dirs=.*#log.dirs=$(KAFKA_DATA)#' $(KAFKA_HOME)/config/server.properties > $(KAFKA_DATA)/server.properties; \
+	  sed -e 's#^log.dirs=.*#log.dirs=$(KAFKA_DATA)#' \
+	      -e 's#^listeners=.*#listeners=PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093#' \
+	      -e 's#^advertised.listeners=.*#advertised.listeners=PLAINTEXT://127.0.0.1:9092#' \
+	      -e 's#^controller.quorum.bootstrap.servers=.*#controller.quorum.bootstrap.servers=127.0.0.1:9093#' \
+	      $(KAFKA_HOME)/config/server.properties > $(KAFKA_DATA)/server.properties; \
 	  $(KAFKA_HOME)/bin/kafka-storage.sh format -t $$($(KAFKA_HOME)/bin/kafka-storage.sh random-uuid) -c $(KAFKA_DATA)/server.properties >/dev/null; \
 	fi
 	@pgrep -f "kafka.Kafka $(KAFKA_DATA)" >/dev/null && echo "kafka already running" || \
@@ -48,27 +52,31 @@ kafka-down:
 es-up:
 	@mkdir -p $(LOGS)
 	@pgrep -f "org.elasticsearch.bootstrap.Elasticsearch" >/dev/null && echo "es already running" || \
-	  (ES_JAVA_OPTS="-Xms512m -Xmx1g" nohup $(ES_HOME)/bin/elasticsearch -E discovery.type=single-node -E xpack.security.enabled=false -E xpack.ml.enabled=false -E http.port=9200 > $(LOGS)/es.log 2>&1 & \
+	  (ES_JAVA_OPTS="-Xms512m -Xmx1g" nohup $(ES_HOME)/bin/elasticsearch -E discovery.type=single-node -E network.host=127.0.0.1 -E xpack.security.enabled=false -E xpack.ml.enabled=false -E http.port=9200 > $(LOGS)/es.log 2>&1 & \
 	   for i in $$(seq 1 60); do curl -s localhost:9200 >/dev/null 2>&1 && break; sleep 2; done; curl -s localhost:9200 | grep -o '"number" : "[^"]*"' | head -1; echo "es up on 9200")
 
 es-down:
 	-pkill -f "org.elasticsearch.bootstrap.Elasticsearch" && echo "es stopped"
 
 # ---------- Postgres (user-space binaries, no root) ----------
+# Listens on 127.0.0.1 only; TCP needs the scram password in $(PG_PWFILE) (mode 600, generated once);
+# the unix socket lives inside the 0700 data dir so only this user can reach it.
+PG_PWFILE ?= $(HOME)/tools/pg.pw
 pg-up:
 	@mkdir -p $(LOGS)
-	@if [ ! -f $(PG_DATA)/PG_VERSION ]; then $(PG_HOME)/bin/initdb -D $(PG_DATA) -U postgres --auth=trust -E UTF8 >/dev/null && echo "initdb done"; fi
+	@if [ ! -f $(PG_PWFILE) ]; then (umask 077; head -c 24 /dev/urandom | base64 | tr -d '/+=' > $(PG_PWFILE)); fi
+	@if [ ! -f $(PG_DATA)/PG_VERSION ]; then $(PG_HOME)/bin/initdb -D $(PG_DATA) -U postgres --auth-local=peer --auth-host=scram-sha-256 --pwfile=$(PG_PWFILE) -E UTF8 >/dev/null && echo "initdb done"; fi
 	@$(PG_HOME)/bin/pg_ctl -D $(PG_DATA) status >/dev/null 2>&1 && echo "postgres already running" || \
-	  $(PG_HOME)/bin/pg_ctl -D $(PG_DATA) -o "-p $(PG_PORT) -k /tmp" -l $(LOGS)/pg.log start >/dev/null
-	@$(PG_HOME)/bin/psql -h /tmp -p $(PG_PORT) -U postgres -tc "select 1 from pg_database where datname='$(PG_DB)'" | grep -q 1 || \
-	  $(PG_HOME)/bin/psql -h /tmp -p $(PG_PORT) -U postgres -c "create database $(PG_DB)" >/dev/null
-	@echo "postgres up on $(PG_PORT), db $(PG_DB)"
+	  $(PG_HOME)/bin/pg_ctl -D $(PG_DATA) -o "-p $(PG_PORT) -k $(PG_DATA) -c listen_addresses=127.0.0.1 -c unix_socket_permissions=0700" -l $(LOGS)/pg.log start >/dev/null
+	@PGPASSWORD=$$(cat $(PG_PWFILE)) $(PG_HOME)/bin/psql -h 127.0.0.1 -p $(PG_PORT) -U postgres -tc "select 1 from pg_database where datname='$(PG_DB)'" | grep -q 1 || \
+	  PGPASSWORD=$$(cat $(PG_PWFILE)) $(PG_HOME)/bin/psql -h 127.0.0.1 -p $(PG_PORT) -U postgres -c "create database $(PG_DB)" >/dev/null
+	@echo "postgres up on 127.0.0.1:$(PG_PORT), db $(PG_DB) (password in $(PG_PWFILE))"
 
 pg-down:
 	-$(PG_HOME)/bin/pg_ctl -D $(PG_DATA) stop -m fast >/dev/null && echo "postgres stopped"
 
 psql:
-	$(PG_HOME)/bin/psql -h /tmp -p $(PG_PORT) -U postgres $(PG_DB)
+	PGPASSWORD=$$(cat $(PG_PWFILE)) $(PG_HOME)/bin/psql -h 127.0.0.1 -p $(PG_PORT) -U postgres $(PG_DB)
 
 services-up: pg-up kafka-up es-up
 services-down: es-down kafka-down pg-down
