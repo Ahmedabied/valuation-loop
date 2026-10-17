@@ -61,3 +61,10 @@ of the process it runs in) and is not part of the split run.
 ## When something is off
 `make status` (by port). The app log is `~/tools/logs/app.log`, the replay's `~/tools/logs/replay.log`. A scenario
 that waits more than 30 s answers 500 with what it was waiting for. `make load` rebuilds the ES indices (about 25 s).
+
+## Side-by-side page
+`make demo` stops the app at the end, so start it yourself: `make services-up`, then `make run` (profiles `local,demo`).
+In a second terminal, run the ok scenario (it needs the comparables index, `make load`) and keep its request id:
+`ID=$(curl -s -X POST 127.0.0.1:8080/simulator/scenarios/ok | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["requestId"])')`
+then `make page ID=$ID` prints the URL to open. The ok scenario already chose an agent, so the page shows the three
+replies with "Choose this agent" disabled; the other buttons still record engagement. `src/main/resources/static/comparison.html`.
