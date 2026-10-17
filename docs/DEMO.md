@@ -1,6 +1,7 @@
 # make demo and make replay
 
-`make demo` starts Postgres, Kafka and Elasticsearch (if they are not up), builds the jar, starts the app under the
+`make demo` starts Postgres, Kafka and Elasticsearch (if they are not up), runs `make load` if `comparables-v1` is
+missing, builds the jar, starts the app under the
 `local,demo` profiles (logs: `~/tools/logs/app.log`, JSON), runs every scenario, prints what follows, and stops the app
 it started. The services stay up; `make services-down` stops them. It can be run again straight away.
 
@@ -18,7 +19,9 @@ it started. The services stay up; `make services-down` stops them. It can be run
 3. **`GET /valuation-requests/{id}/comparison`** for the `ok` request: replies in reply order, the disclaimer, the pack.
 4. **`GET /agents/{selected}/scorecard`**: that agent's own numbers next to a labelled fixture benchmark.
 5. **`GET /scorecard/product-query`** (internal, demo profile): share of engagement and instructions won by the
-   highest-range reply, split by evidence attached. Numbers grow with each run: the demo data accumulates.
+   highest-range reply, split by evidence attached. Numbers grow with each run: the demo data accumulates. The
+   scenarios are scripted (the evidenced agent replies at its comparables' range and is always the one selected), so
+   these numbers show the query works end to end, not that evidence wins sellers.
 6. **Metrics** from `127.0.0.1:8081/actuator/prometheus`:
    `outbox_unsent` (rows committed, not yet on Kafka; should return to 0), `dlt_records_total` (dead-lettered
    deliveries since start), `reply_minutes_count/_sum/_max` (delivery -> reply; near 0 in a simulation).
