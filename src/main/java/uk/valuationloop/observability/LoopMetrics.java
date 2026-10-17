@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  *   dlt_records_total    counter  DeliverLead records that reached lead.deliver.v1-dlt (LeadDeliveryListener)
  *   reply_minutes        summary  minutes from delivery to the agent's reply (_count, _sum, _max), ReplyService
  * </pre>
- * Labels are deliberately absent: no agentId label, so no metric can be read as a per-agent league table.
+ * Labels are deliberately absent: no agentId label, so no metric compares one agent with another.
  */
 @Component
 public class LoopMetrics {

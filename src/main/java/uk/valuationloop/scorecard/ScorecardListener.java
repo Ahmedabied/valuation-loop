@@ -53,6 +53,9 @@ public class ScorecardListener {
             return;
         }
         // the envelope's traceparent makes this log under the traceId of the API request that caused the event
-        EventTracing.inTrace(envelope.traceparent(), "scorecard.apply", () -> projector.apply(envelope));
+        EventTracing.inTrace(envelope.traceparent(), "scorecard.apply", () -> {
+            projector.apply(envelope);
+            log.info("scorecard applied {} {} for lead {}", envelope.eventType(), envelope.eventId(), envelope.leadId());
+        });
     }
 }
