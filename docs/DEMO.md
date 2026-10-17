@@ -62,6 +62,12 @@ of the process it runs in) and is not part of the split run.
 `make status` (by port). The app log is `~/tools/logs/app.log`, the replay's `~/tools/logs/replay.log`. A scenario
 that waits more than 30 s answers 500 with what it was waiting for. `make load` rebuilds the ES indices (about 25 s).
 
+Migrations: the app runs Flyway on start, in version order. A database made by an earlier build (V1-V3 in
+`~/tools/pgdata`) upgrades in place: the first start logs `Current version of schema "public": 3`, then migrates to 4
+and 5 (checked 2026-10-17). `out-of-order` stays `false`, so if a database ever had V5 without V4, Flyway refuses to
+start rather than apply V4 late; then either run `flyway repair` after checking the history table by hand, or rebuild
+the demo database (`make pg-down`, move `~/tools/pgdata` aside, `make pg-up`; the demo data is all simulated).
+
 ## Side-by-side page
 `make demo` stops the app at the end, so start it yourself: `make services-up`, then `make run` (profiles `local,demo`).
 In a second terminal, run the ok scenario (it needs the comparables index, `make load`) and keep its request id:
