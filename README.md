@@ -227,3 +227,5 @@ selection. `make page ID=<requestId>` prints the URL; `docs/DEMO.md` says how to
 and embedded Kafka, no services. Job `test-es` (after `test`): an Elasticsearch 8.19.4 service container, then
 `./gradlew test -Pes=true`, which adds the live-Elasticsearch tests. Test reports are uploaded when a job fails.
 Dependabot checks Gradle dependencies weekly.
+
+Code: MIT (see LICENSE). Data: see Data and licences above.
