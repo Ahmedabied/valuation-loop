@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import uk.valuationloop.delivery.OptimisticLockRetry;
 
 /**
  * Agent-private evidence API. Every path starts with the agent and the lead, and the service checks the agent owns
@@ -47,12 +48,13 @@ public class EvidenceController {
     @DeleteMapping("/{packId}/comparables/{ppdTransactionId}")
     public EvidenceService.AgentPackView exclude(@PathVariable String agentId, @PathVariable String leadId,
                                                  @PathVariable String packId, @PathVariable String ppdTransactionId) {
-        return service.exclude(agentId, leadId, packId, ppdTransactionId);
+        // like reply and visit: a lost optimistic-lock race (the pack or lead changed meanwhile) is tried again
+        return OptimisticLockRetry.run(() -> service.exclude(agentId, leadId, packId, ppdTransactionId));
     }
 
     @PostMapping("/{packId}/attach")
     public EvidenceService.AgentPackView attach(@PathVariable String agentId, @PathVariable String leadId,
                                                 @PathVariable String packId) {
-        return service.attach(agentId, leadId, packId);
+        return OptimisticLockRetry.run(() -> service.attach(agentId, leadId, packId));
     }
 }
