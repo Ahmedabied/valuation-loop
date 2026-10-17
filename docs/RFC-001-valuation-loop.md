@@ -117,8 +117,10 @@ CREATED -deliver-> DELIVERING(n) -ok-> DELIVERED -reply-> REPLIED -evidence-> EV
 An instruction is a fact on the lead (`instructed_at`), not a state: it is recorded in any state, because a seller may
 phone the agent directly. Contact details unlock only once the lead has replied.
 
-**Closure rule (decided 2026-10-17).** The deadline scanner closes a request with reason `ALL_LEADS_TERMINAL` only when
-every lead is terminal and none replied. If any lead replied, the request stays `REPLIES_IN` until the seller selects
+**Closure rule (decided 2026-10-17).** A request closes with reason `ALL_LEADS_TERMINAL` only when every lead is
+terminal and none replied. Two places check it: the deadline scanner after it expires a lead, and the DLT handler
+after a lead becomes `DELIVERY_FAILED` (so a request whose every CRM failed closes too;
+`delivery/DeliveryRetryAndDltTest.aRequestWhoseOnlyLeadFailsDeliveryCloses`). If any lead replied, the request stays `REPLIES_IN` until the seller selects
 (reason `SELLER_SELECTED`). Code: `request/RequestCloser`; test:
 `delivery/DeadlineScannerTest.aRequestWithAReplyStaysOpenWhenTheOtherLeadsExpire`. This is also listed in §19 for
 the owner to confirm.
@@ -162,7 +164,9 @@ idempotent.*
 - Crash after send, before `sent_at` commits: the row is still unsent and is sent again. Consumers absorb the repeat
   (delivery skips a lead already delivered; the scorecard upserts by `lead_id`). End to end that is effectively once,
   not exactly once.
-- `SKIP LOCKED` lets several app instances run the relay without sending the same row twice.
+- `SKIP LOCKED` lets several app instances run the relay without sending the same row twice. It does not keep
+  per-key order across instances (one can send a later row for a key while another still holds an earlier one); v1
+  runs one instance, and the scorecard's rules do not depend on order anyway.
 
 `OutboxRelayTest` stands in the gap: the relay scheduler is off, the test commits, checks the topic is empty, runs the
 relay as a restart would, and sees exactly one record; a second relay run sends nothing.
@@ -277,8 +281,10 @@ names no agent. On simulated data its output means nothing; on real traffic it i
   (`dataloader/OsgbToWgs84`, tested in `OsgbToWgs84Test`). OS, Royal Mail and National Statistics attribution (README).
 - EPC: 90.2% of sales matched to a certificate by a hashed normalised address key held only in loader memory. Only
   OGL-licensed derived fields are indexed (floor area, energy rating, built form, construction age, habitable rooms,
-  property type refinement). Address fields are never stored, indexed, logged or committed. For the subject property
-  the address is a lookup key only.
+  property type refinement), with the register's OGL attribution in every pack. Address fields are never stored,
+  indexed, logged or committed. The register permits EPC address data only for purposes related to the energy
+  performance of buildings, so using it as a join key, even in memory, is outside that purpose: acceptable for a
+  non-commercial demo is a judgement, and production would join on Rightmove's own address data instead.
 - In production Rightmove would use its own address licences; the demo relies on the non-commercial permission.
 - The loader runs under the `loader` profile with Elasticsearch only (`make load`, about 23 s).
 
@@ -304,11 +310,18 @@ retention period. The real product would set one by its own policy; this is a kn
 
 ## 16. Observability
 
-In v1 today: Actuator `health`, `info`, `metrics` and `prometheus` on the loopback management port; the Prometheus
-registry and the Micrometer OpenTelemetry bridge on the classpath; a `traceparent` field in every envelope.
-Planned for v1: `traceId` in JSON logs carried through Kafka headers, and three metrics, `outbox_unsent`,
-`dlt_records` and `reply_minutes`. Jaeger is v2.
-<!-- verify after merge: traceId logging and the three metric names as implemented -->
+- **Traces.** Micrometer Tracing with the OpenTelemetry bridge gives every HTTP request a span. When an event is
+  written, `observability/EventTracing` puts that span's W3C `traceparent` into the envelope; the outbox relay and
+  both consumers open a child span from it. The trace travels inside the event, not in Kafka headers, because the
+  relay sends on a scheduler thread after the request has finished. Sampling is 1.0 under the `local` profile.
+- **Logs.** Under the `local` profile (`make demo`, `make replay`) the app logs ECS JSON, one object per line, with
+  `traceId` and `spanId` from the MDC (`application-local.yml`); one `grep <traceId>` shows the API thread, the relay,
+  the delivery consumer and the scorecard consumer for one request. Tests keep plain text logs.
+- **Metrics** (`observability/LoopMetrics`, on `127.0.0.1:8081/actuator/prometheus`, no agent label on any of them):
+  `outbox_unsent` (gauge: rows committed but not yet on Kafka, sampled every relay tick), `dlt_records_total`
+  (counter: DeliverLead records that reached `lead.deliver.v1-dlt`), `reply_minutes` (summary: delivery to reply,
+  exported as `reply_minutes_count`, `_sum`, `_max`).
+- Actuator also serves `health`, `info` and `metrics` on that loopback port. Jaeger (a trace UI) is v2.
 
 ## 17. Versions
 
