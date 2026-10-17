@@ -23,6 +23,9 @@ import uk.valuationloop.comparison.ComparisonQuery;
 import uk.valuationloop.comparison.ComparisonView;
 import uk.valuationloop.comparison.SellerActions;
 import uk.valuationloop.comparison.SellerActions.EngagementAction;
+import uk.valuationloop.completion.CompletionMatch;
+import uk.valuationloop.completion.CompletionMatchRepository;
+import uk.valuationloop.completion.CompletionScanner;
 import uk.valuationloop.delivery.DeadlineService;
 import uk.valuationloop.delivery.FlakyAdapter;
 import uk.valuationloop.delivery.OptimisticLockRetry;
@@ -90,6 +93,8 @@ public class SimulatorScenarios {
     private final ObjectMapper json;
     private final Clock clock;
     private final KafkaListenerEndpointRegistry listeners;
+    private final CompletionScanner completions;
+    private final CompletionMatchRepository completionMatches;
     private final String postcode;
 
     public SimulatorScenarios(ValuationRequestService requestService, ValuationRequestRepository requests,
@@ -97,7 +102,8 @@ public class SimulatorScenarios {
                               EvidenceService evidence, ComparisonQuery comparison, SellerActions seller,
                               OutcomeService outcomes, DeadlineService deadlines, FlakyAdapter flaky,
                               ScorecardFactRepository facts, LoopMetrics metrics, ObjectMapper json, Clock clock,
-                              KafkaListenerEndpointRegistry listeners,
+                              KafkaListenerEndpointRegistry listeners, CompletionScanner completions,
+                              CompletionMatchRepository completionMatches,
                               @Value("${valuationloop.simulator.postcode:SW11 1AA}") String postcode) {
         this.requestService = requestService;
         this.requests = requests;
@@ -115,6 +121,8 @@ public class SimulatorScenarios {
         this.json = json;
         this.clock = clock;
         this.listeners = listeners;
+        this.completions = completions;
+        this.completionMatches = completionMatches;
         this.postcode = postcode;
     }
 
@@ -142,7 +150,8 @@ public class SimulatorScenarios {
      * from live Elasticsearch, removes one comparable, replies at the range its comparables imply and attaches the
      * pack; the third replies without evidence. The seller views all three, asks the evidenced agent for a visit and
      * selects it; that agent books the visit; its CRM reports the instruction by webhook (leadRef); the scorecard
-     * consumer joins it all onto the lead's fact.
+     * consumer joins it all onto the lead's fact. In the "ok" scenario the Land Registry late match then runs once
+     * (the same scan the scheduler makes) and, if a sale matches, the completion and its price gap join the fact too.
      */
     private ScenarioReport fullLoop(String scenario, String proves, String highAgent, String evidencedAgent,
                                     String plainAgent) {
@@ -192,6 +201,9 @@ public class SimulatorScenarios {
 
         ScorecardFact fact = awaitFact(evidencedLead, "the scorecard fact shows the instruction",
                 f -> f.isInstructed() && f.isSellerSelected() && f.isVisitBooked() && f.isEvidenceAttached());
+        if (scenario.equals("ok")) {
+            fact = completionStep(evidencedLead, fact, checks);
+        }
         checks.put("scorecard fact of the selected lead", factExcerpt(fact));
         return report(scenario, proves, requestId, checks, evidencedAgent, started);
     }
@@ -258,6 +270,29 @@ public class SimulatorScenarios {
                 requestId, checks, AGENT_OK_2, started);
     }
 
+    /**
+     * The v2 late match: one scan now, then, if the instructed lead got a completion, wait for the scorecard to join it.
+     * The demo keys on postcode + property type + date only, and the request's postcode comes from a real PPD sale, so
+     * against the real index the match can be that sale itself; the report line says so rather than imply a discovery.
+     * No match is a normal outcome (Land Registry publishes weeks after a completion), reported as completed=false.
+     */
+    private ScorecardFact completionStep(String leadId, ScorecardFact fact, Map<String, Object> checks) {
+        var scan = completions.scanOnce();
+        CompletionMatch match = completionMatches.findById(leadId).orElse(null);
+        if (match == null) {
+            checks.put("Land Registry late match", "completed=false (no " + PropertyType.FLAT + " sale at " + postcode
+                    + " transferred on or after " + completions.rule().earliestTransfer(leadOfId(leadId).getInstructedAt())
+                    + " in the index; scanned " + scan.scanned() + " instructed lead(s))");
+            return fact;
+        }
+        ScorecardFact joined = awaitFact(leadId, "the scorecard fact shows the completion",
+                f -> f.getCompletedPrice() != null && f.getPriceGapPct() != null);
+        checks.put("Land Registry late match", "completed=true, priceGapPct=" + joined.getPriceGapPct().toPlainString()
+                + " (" + match.getPpdTransactionId() + ", " + "GBP " + match.getCompletedPrice().toPlainString() + " on "
+                + match.getCompletedAt() + "; demo: self-match possible, keyed on postcode+type+date, not the address)");
+        return joined;
+    }
+
     // ---------- steps ----------
 
     private String createRequest(String scenario, List<String> agentIds) {
@@ -275,6 +310,10 @@ public class SimulatorScenarios {
     /** Whole thousands of pounds, the way agents quote. */
     private static BigDecimal pounds(double value) {
         return BigDecimal.valueOf(Math.round(value / 1000.0) * 1000);
+    }
+
+    private AgentLead leadOfId(String leadId) {
+        return leads.findById(leadId).orElseThrow();
     }
 
     private AgentLead leadOf(String requestId, String agentId) {
@@ -388,6 +427,8 @@ public class SimulatorScenarios {
         m.put("sellerSelected", f.isSellerSelected());
         m.put("visitBooked", f.isVisitBooked());
         m.put("instructed", f.isInstructed());
+        m.put("completed", f.getCompletedPrice() != null);
+        m.put("priceGapPct", f.getPriceGapPct() == null ? null : f.getPriceGapPct().toPlainString());
         return m;
     }
 
