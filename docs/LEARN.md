@@ -31,7 +31,7 @@ against RFC §7 only after you have written it.
 | 3 | Every `package-info.java` | 10 each | Each module in one breath |
 | 4 | `lead/LeadState`, `LeadEvent`, `LeadTransitions`; `request/RequestState`, `RequestTransitions` | 25, 30, 45, 20, 40 | Both state machines as pure functions |
 | 5 | `lead/LeadTransitionsTest`, `request/RequestTransitionsTest` | 60, 40 | How a transition table is tested |
-| 6 | `src/main/resources/db/migration/V1__core_tables.sql`, `V2__evidence_pack.sql`, `V3__scorecard_fact.sql` | 70, 45, 30 | The tables, with comments |
+| 6 | `src/main/resources/db/migration/V1__core_tables.sql`, `V2__evidence_pack.sql`, `V3__scorecard_fact.sql`, `V4__drop_processed_event.sql` | 70, 45, 30, 4 | The tables, with comments |
 | 7 | `request/ValuationRequestController`, `ValuationRequestService`, `ValuationRequest`; `agent/AgentDirectory` | 80, 105, 100, 40 | Step 1 of the loop |
 | 8 | `outbox/EventEnvelope`, `OutboxWriter`, `OutboxEvent`, `OutboxRepository`, `OutboxRelay`, `Topics` | 35, 40, 75, 25, 90, 30 | The outbox |
 | 9 | `outbox/OutboxRelayTest`, `request/ValuationRequestFlowTest` | 100, 155 | The outbox claim, the fan-out |
@@ -193,7 +193,8 @@ perfect match. Put the weight back and `NO-AREA` is always second.
   version used elsewhere.
 - **Flyway vs Django migrations.** Flyway runs hand-written SQL files `V1__...sql`, `V2__...sql` in order and records
   them in a history table. Nothing is generated from the entities; `ddl-auto: validate` only checks the entities match.
-  Never edit an applied migration; add `V4`.
+  Never edit an applied migration; add the next one (`V4__drop_processed_event.sql` drops a table V1 created that
+  no consumer needed).
 - **MockMvc vs the Django test client.** `mvc.perform(post("/valuation-requests").content(...))
   .andExpect(status().isCreated())` drives the whole Spring MVC stack in process without a port, like
   `self.client.post(...)` and `assertEqual(response.status_code, 201)`.

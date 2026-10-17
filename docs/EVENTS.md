@@ -37,9 +37,10 @@ leads queued behind it (the demo's `slow` scenario shows it); a failed call does
 
 ## Idempotency rule
 Delivery is at-least-once (the outbox relay may resend after a crash), so every consumer must tolerate a repeat.
-`eventId` is the idempotency key: a consumer whose side effect is not a natural-key upsert records it in
-`processed_event`. The scorecard needs no dedupe table: it upserts `scorecard_fact` by `lead_id`, so applying the
-same event twice, or replaying the topics from the start, leaves the same row.
+Every v1 consumer is idempotent by natural key, so none needs a dedupe table: the delivery consumer checks the lead's
+state before it acts (a lead already delivered is not sent again), and the scorecard upserts `scorecard_fact` by
+`lead_id`, so applying the same event twice, or replaying the topics from the start, leaves the same row. `eventId`
+stays on every envelope as the event's identity.
 
 ## Changing an event
 Adding an optional field is a schema edit plus a test. Renaming or removing a field, or changing its meaning, is a
