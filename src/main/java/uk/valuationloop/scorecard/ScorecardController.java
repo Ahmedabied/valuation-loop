@@ -1,6 +1,5 @@
 package uk.valuationloop.scorecard;
 
-import java.util.List;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,23 +9,19 @@ import uk.valuationloop.agent.AgentDirectory;
 /**
  * <pre>
  * GET /agents/{agentId}/scorecard   the agent's own numbers + a fixture benchmark label; 404 for an unknown agent
- * GET /scorecard/product-query      internal: the ARCHITECTURE §9 product query rows (aggregated, names no agent)
- * GET /scorecard/snapshot           internal: every fact ordered by lead_id, for the replay diff in the demo script
  * </pre>
  * v1 has no authentication: the agentId in the path stands in for the logged-in agent, and the query is scoped to it.
- * The two /scorecard endpoints are for the portal's own team and the demo, never linked from an agent or seller page.
+ * The internal product query and fact snapshot live in {@link ScorecardInternalController} (demo/test profiles only).
  */
 @RestController
 public class ScorecardController {
 
     private final ScorecardFactRepository facts;
     private final AgentDirectory directory;
-    private final ProductQuery productQuery;
 
-    public ScorecardController(ScorecardFactRepository facts, AgentDirectory directory, ProductQuery productQuery) {
+    public ScorecardController(ScorecardFactRepository facts, AgentDirectory directory) {
         this.facts = facts;
         this.directory = directory;
-        this.productQuery = productQuery;
     }
 
     @GetMapping("/agents/{agentId}/scorecard")
@@ -36,17 +31,6 @@ public class ScorecardController {
             throw new UnknownAgent(agentId);
         }
         return AgentScorecard.of(agentId, facts.findByAgentId(agentId));
-    }
-
-    @GetMapping("/scorecard/product-query")
-    public List<ProductQuery.Row> productQuery() {
-        return productQuery.run();
-    }
-
-    @GetMapping("/scorecard/snapshot")
-    @Transactional(readOnly = true)
-    public List<FactSnapshot> snapshot() {
-        return facts.findAllByOrderByLeadId().stream().map(FactSnapshot::of).toList();
     }
 
     /** 404 (mapped in {@link uk.valuationloop.api.ApiErrors}). */
