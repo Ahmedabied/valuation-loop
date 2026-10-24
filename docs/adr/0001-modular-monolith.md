@@ -25,5 +25,5 @@ already exist.
   modules. A boundary check (for example Spring Modulith's `ApplicationModules.verify()`) is a cheap v2 addition.
 - It does not show cross-service deployment, service discovery or independent scaling. Splitting `delivery` into a
   second deployable is v2 day 2 and is small: its only inputs and outputs are already Kafka topics.
-- An interviewer may ask "why not microservices?". The answer is the outbox hole, the memory budget, and that the
+- A reviewer may ask "why not microservices?". The answer is the outbox hole, the memory budget, and that the
   split point is designed in rather than paid for up front.

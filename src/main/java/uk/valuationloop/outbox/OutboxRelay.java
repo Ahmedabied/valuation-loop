@@ -25,7 +25,7 @@ import uk.valuationloop.observability.LoopMetrics;
  *
  * If the process dies after the send but before the commit, the row is still unsent and goes again on restart:
  * at-least-once delivery. Every consumer is idempotent by natural key (lead state, upsert by lead_id), which makes
- * the whole chain effectively-once; there is no dedupe table. That sentence is the one to say in the interview.
+ * the whole chain effectively-once; there is no dedupe table. That is the delivery guarantee.
  *
  * The scheduled tick and the transactional batch are separate beans on purpose: a @Transactional method called
  * from inside the same class is NOT proxied, so the transaction would silently not exist.
