@@ -3,8 +3,8 @@
 
 -- One row per instructed lead whose eventual sale was found in Land Registry Price Paid Data. Written by the
 -- completion module in the same transaction as its CompletionMatched outbox row; the primary key on lead_id is what
--- makes a rescan a no-op. A private outcome fact: it feeds the agent's own scorecard and the portal's internal
--- product query, never the seller page. No address is stored: the PPD transaction id is the public reference.
+-- makes a rescan a no-op. A private outcome fact: it feeds the agent's own scorecard and the platform's
+-- internal product query, never the seller page. No address is stored: the PPD transaction id is the public reference.
 create table completion_match (
     lead_id            varchar(40)   primary key references agent_lead (id),
     request_id         varchar(40)   not null,
