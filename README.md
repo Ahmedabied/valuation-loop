@@ -1,14 +1,11 @@
 # Valuation Loop
 
-> "By joining our team, you'll help homeowners pick the right agent for them and help agents get better at what they
-> do." (the portal, agent selection vacancy)
+A backend for the moment a homeowner asks several estate agents for a valuation and has to choose one.
 
-This is my attempt at that problem, to see whether I read it right.
-
-I built the backend for the portal's choose-an-agent moment: a valuation lead that reaches each agent reliably, comes
-back with evidence the agent chose to attach, records what the homeowner did with it and whether it became a visit
-and an instruction, and gives the agent a private view of their own numbers, in the portal's stack (Java 21, Spring
-Boot, Kafka, Elasticsearch, Postgres, Gradle).
+A valuation lead reaches each agent reliably. The reply comes back with evidence the agent chose to attach. The
+system records what the homeowner did with it, and whether it became a visit and an instruction. Each agent gets a
+private view of their own numbers. Built by Ahmed Abied in Java 21, Spring Boot, Kafka, Elasticsearch, Postgres
+and Gradle.
 
 Property data is real (HM Land Registry Price Paid Data and EPC certificates for Wandsworth and Lambeth). Agents,
 CRMs, sellers and outcomes are simulated. The repo proves mechanics and hands a product team an instrument. It does
@@ -228,8 +225,8 @@ and `POST /simulator/outbox-gap` (`demo`), `POST /completions/scan` (`demo`, `te
 - Data vintage on every pack: `ppd-2024-2026+epc-2026-10`.
 - **The EPC decision.** The EPC register limits use of its address fields to purposes related to the energy
   performance of buildings. This demo uses EPC addresses only in memory, to join floor area to sales, and is a
-  non-commercial demonstration. A production deployment would use the operator's own address licences (the portal has
-  them) or run with `loader.epc.enabled=false`, which the loader supports.
+  non-commercial demonstration. A production deployment would use the operator's own address licences, or run
+  with `loader.epc.enabled=false`, which the loader supports.
 - The raw downloads live outside the repo (`../data-raw/`) and are never committed.
 
 ## Personal data
