@@ -7,6 +7,6 @@
  * of the two arrived first; it is private like every other fact. GET /agents/{id}/scorecard shows an agent its own numbers and a fixture
  * benchmark label, never anyone else's; ScorecardInternalController (demo/test profiles only) serves the platform's
  * own product query and the fact snapshot. ScorecardRebuilder is `make replay`: stop, truncate, reset offsets, start.
- * Interview answer: "facts are a pure function of the event log, so I can drop the table and replay the topics."
+ * In one sentence: "facts are a pure function of the event log, so I can drop the table and replay the topics."
  */
 package uk.valuationloop.scorecard;

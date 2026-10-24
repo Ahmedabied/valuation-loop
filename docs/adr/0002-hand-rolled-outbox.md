@@ -14,7 +14,7 @@ found two traps that matter here:
    which Spring skips when there is no transaction, so the event leaves only when a resubmission timer fires (about
    30 seconds later) or on restart. A non-transactional listener or a self-invoked method produces late events and no
    error.
-The owner must also be able to explain, in an interview, exactly what happens between commit and send.
+The owner must also be able to explain, in a design review, exactly what happens between commit and send.
 
 ## Decision
 Write the outbox by hand. `OutboxWriter.write` inserts the envelope into an `outbox` table inside the caller's
