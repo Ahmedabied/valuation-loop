@@ -5,8 +5,8 @@
 - **Date:** 2026-10-17
 - **Repo:** this one. Event contract: [EVENTS.md](EVENTS.md). Decisions: [adr/](adr/).
 
-This RFC describes a backend for the moment a homeowner on Rightmove asks several agents for a valuation and
-chooses one. It proves mechanics: a lead reaches each agent through an unreliable integration, the reply can carry
+This RFC describes a backend for the moment a homeowner on a property portal asks several agents for a valuation
+and chooses one. It proves mechanics: a lead reaches each agent through an unreliable integration, the reply can carry
 evidence built from real public data, and what the homeowner and the agent do next joins back to the lead in a
 replayable log. It does not prove business impact. Property data is real (Land Registry Price Paid and EPC);
 agents, CRMs, sellers and outcomes are simulated. What it hands the product team is an instrument: the facts and the
@@ -54,22 +54,22 @@ agent. `make stats` reproduces it from the loaded index.
 
 ## 2. The problem
 
-Agent Select's job is that the moment a homeowner chooses an agent on Rightmove ends with a confident homeowner
-instructing one of the agents Rightmove connected them to, and with that agent able to see it happened. Agents buy the
+The goal is that the moment a homeowner chooses an agent on a property portal ends with a confident homeowner
+instructing one of the agents the portal connected them to, and with that agent able to see it happened. Agents buy
 valuation-lead products because of that moment.
 
 Two things are missing at that moment today. The homeowner gets prices from several agents and cannot compare them on
 evidence. And the platform does not own the join from lead to visit to instruction, so neither side can see what a
 good answer looks like. The design gives the homeowner the evidence each agent chose to attach, gives each agent a
-private view of its own numbers, and records the facts a product team needs, without Rightmove judging any agent.
+private view of its own numbers, and records the facts a product team needs, without the portal judging any agent.
 
-## 3. Where it sits in the real flow
+## 3. Where it sits in a portal's flow
 
 ```
-Seller                      Rightmove (this repo in [ ])                         Agent
+Seller                      Portal (this repo in [ ])                            Agent
 instant estimate (exists)
-Find Agent (exists)
-select agents / OAV form -> [ValuationRequested]
+find-an-agent page (exists)
+select agents / valuation form -> [ValuationRequested]
                             [match = eligibility lookup only: slot holders
                              for the outcode, or the agents the seller picked]
                             [DeliverLead -> adapter, retries, DLT] ----------> CRM (simulated)
@@ -285,8 +285,8 @@ names no agent. On simulated data its output means nothing; on real traffic it i
   indexed, logged or committed.
 - **The EPC decision.** The EPC register limits use of its address fields to purposes related to the energy
   performance of buildings. This demo uses EPC addresses only in memory, to join floor area to sales, and is a
-  non-commercial demonstration. A production deployment would use the operator's own address licences (Rightmove has
-  them) or run with `loader.epc.enabled=false`, which the loader supports.
+  non-commercial demonstration. A production deployment would use the operator's own address licences, or run
+  with `loader.epc.enabled=false`, which the loader supports.
 - The loader runs under the `loader` profile with Elasticsearch only (`make load`, about 23 s).
 
 **Personal data.** The system holds a pseudonymous `sellerRef` and nothing else about the seller: no names, emails or
@@ -360,7 +360,7 @@ open-source support on 2026-06-30). What changed and what to watch: `docs/adr/00
 2. **One attached pack per lead.** Enforced in `EvidenceService.attach` and by the lead's state table, because H2 cannot
    run the partial unique index (`unique (lead_id) where attached_at is not null`). Should Postgres also get the
    index, as a Postgres-only migration?
-3. **Reply window.** v1 uses 24 hours after delivery. OAV's rule is "by the end of the next working day". Is the
+3. **Reply window.** v1 uses 24 hours after delivery. The usual rule is "by the end of the next working day". Is the
    simplification acceptable for v1, or should the deadline use a working-day calendar?
 4. **LeadDeliveryFailed.** Today it is recorded on the agent's own record only. Should it also notify the agent (their
    CRM is the thing failing, so the notice would need another channel)?
