@@ -17,7 +17,7 @@ import org.springframework.util.StreamUtils;
  * completed price and the replied range's midpoint, for the highest-range reply and for the others. The median is
  * computed in the SQL (percentile_cont, which H2 and Postgres both run). The SQL lives in src/main/resources/sql/product-query.sql so it can be pasted into psql as is.
  *
- * Rightmove-internal product analytics: aggregated across all agents, never shown to an agent or a seller, and it
+ * Internal product analytics: aggregated across all agents, never shown to an agent or a seller, and it
  * names no agent. It answers "do evidenced answers win the seller", not "which agent is best".
  */
 @Component

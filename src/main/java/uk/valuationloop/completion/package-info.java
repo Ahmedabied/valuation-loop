@@ -3,8 +3,8 @@
  * in Land Registry Price Paid Data; {@link uk.valuationloop.completion.CompletionScanner} looks for it and, when it
  * finds one, writes a completion_match row and a CompletionMatched event (outcome.recorded.v1, through the outbox) in
  * one transaction. The scorecard joins it to the lead and computes the gap between the completed price and the
- * midpoint of the range the reply quoted: a PRIVATE fact for the agent's own scorecard and Rightmove's internal
- * product query, never on the seller page.
+ * midpoint of the range the reply quoted: a PRIVATE fact for the agent's own scorecard and the platform's
+ * internal product query, never on the seller page.
  *
  * Honest limits of the demo: the match key is postcode + property type + "sold on or after the instruction minus 30
  * days" (400 in the demo profile, application-demo.yml), nothing more. In production the key would be the UPRN / normalised address under the operator's address

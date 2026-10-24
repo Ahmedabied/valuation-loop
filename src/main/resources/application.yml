@@ -39,7 +39,7 @@ valuationloop:
     enabled: true
     relay-delay-ms: 300
     batch-size: 100
-  reply-window-hours: 24           # OAV: "reply by end of next working day" (simplified to 24h in v1)
+  reply-window-hours: 24           # usual rule: "reply by end of next working day" (simplified to 24h in v1)
   delivery:
     slow-ms: 2000                  # how long the simulated "slow" CRM adapter takes per call
     flaky-failures: 2              # calls per lead the simulated "flaky" adapter fails before it succeeds

@@ -13,7 +13,7 @@ import uk.valuationloop.request.RequestCloser;
 
 /**
  * Every few seconds: expire delivered leads whose reply_due_at has passed, then close any request whose leads are
- * now all terminal. The OAV rule is "reply by the end of the next working day"; v1 simplifies it to
+ * now all terminal. The usual rule is "reply by the end of the next working day"; v1 simplifies it to
  * valuationloop.reply-window-hours (24).
  *
  * Time comes from the injected Clock, never Instant.now(), so a test moves the clock 25 hours forward and calls

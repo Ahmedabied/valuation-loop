@@ -1,7 +1,7 @@
 -- The product query (ARCHITECTURE.md §9): do evidenced answers win the seller, and at what price gap?
 -- Over scorecard_fact, replies that have a range rank (requests with two or more replies), split by whether the reply
 -- carried an evidence pack: of the seller engagement and the instructions those replies got, what share went to the
--- reply with the HIGHEST range. Rightmove-internal product analytics; aggregated, names no agent.
+-- reply with the HIGHEST range. Internal product analytics; aggregated, names no agent.
 -- At what price gap: for the replies whose lead later completed (the v2 Land Registry late match), the median of
 -- price_gap_pct = (completed price - replied range midpoint) / midpoint * 100, separately for the HIGHEST-range reply
 -- and for the others, so each (evidence, highest-range) group has its median. Negative: sold below the midpoint.
