@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * the portal-internal product analytics. Never agent-facing, never linked from an agent or seller page.
+ * Internal product analytics. Never agent-facing, never linked from an agent or seller page.
  *
  * <pre>
  * GET /scorecard/product-query   the ARCHITECTURE §9 product query rows (aggregated over requests, names no agent)

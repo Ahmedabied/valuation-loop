@@ -114,7 +114,7 @@ public class ReplyService {
     }
 
     /**
-     * The one public valuation-request rule (ARCHITECTURE.md §3): the seller's contact details are released only after the agent
+     * The one public lead rule (ARCHITECTURE.md §3): the seller's contact details are released only after the agent
      * has replied. This system holds no seller PII at all (sellerRef is pseudonymous), so the contact returned is a
      * simulated, non-routable address built from the sellerRef; phone is always null.
      */
